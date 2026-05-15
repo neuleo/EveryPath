@@ -32,11 +32,12 @@ class Edge(BaseModel):
     weight: float = 1.0
 
 class GraphData(BaseModel):
-    nodes: List[int]
+    nodes: List[Dict[str, Any]]
     edges: List[Edge]
+    include_dead_ends: bool = True
 
 class RouteResponse(BaseModel):
-    route: List[int]
+    route: List[Dict[str, Any]]
 
 class PolygonRequest(BaseModel):
     coordinates: List[List[float]] # [[lon, lat], ...]
@@ -53,16 +54,23 @@ async def root():
 async def generate_route(data: GraphData):
     try:
         G = nx.Graph()
-        G.add_nodes_from(data.nodes)
+        node_map = {n["id"]: n for n in data.nodes}
+        G.add_nodes_from(node_map.keys())
         for edge in data.edges:
             G.add_edge(edge.u, edge.v, weight=edge.weight)
         
-        if not nx.is_connected(G):
-            raise HTTPException(status_code=400, detail="Graph must be connected")
-            
         service = RoutingService()
-        route = service.solve_cpp(G)
-        return {"route": route}
+        
+        if not data.include_dead_ends:
+            G = service.filter_dead_ends(G)
+        
+        if G.number_of_nodes() == 0:
+             return {"route": []}
+             
+        route_ids = service.solve_cpp(G)
+        route_nodes = [node_map[node_id] for node_id in route_ids if node_id in node_map]
+        
+        return {"route": route_nodes}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

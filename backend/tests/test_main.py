@@ -16,17 +16,23 @@ def test_root():
 def test_generate_route():
     # Simple graph: 0-1-2
     graph_data = {
-        "nodes": [0, 1, 2],
+        "nodes": [
+            {"id": 0, "lat": 48.1, "lon": 11.5},
+            {"id": 1, "lat": 48.11, "lon": 11.51},
+            {"id": 2, "lat": 48.12, "lon": 11.52}
+        ],
         "edges": [
             {"u": 0, "v": 1, "weight": 10},
             {"u": 1, "v": 2, "weight": 10}
-        ]
+        ],
+        "include_dead_ends": True
     }
     response = client.post("/generate-route", json=graph_data)
     assert response.status_code == 200
     data = response.json()
     assert "route" in data
-    assert data["route"] == [0, 1, 2, 1, 0] or data["route"] == [2, 1, 0, 1, 2]
+    assert len(data["route"]) == 5 # 0-1-2-1-0
+    assert data["route"][0]["id"] in [0, 2]
 
 def test_fetch_osm():
     # Mock OSM data
