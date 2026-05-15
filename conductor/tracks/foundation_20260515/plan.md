@@ -33,7 +33,7 @@
 - [x] Task: Conductor - User Manual Verification 'Core Routing Service (CPP Foundation)' (f50f611)
 
 ## Phase 4: API & Export Foundation
-- [ ] Task: Implement Route Generation API Endpoint
+- [~] Task: Implement Route Generation API Endpoint
     - [ ] Create POST endpoint that accepts a simple graph JSON and returns an Eulerian circuit
 - [ ] Task: Implement GPX Export Utility
     - [ ] Write unit tests for GPX XML generation
