@@ -5,10 +5,10 @@
     - [x] Write `docker-compose.yml` defining `backend` and `frontend` services
     - [x] Create `backend/Dockerfile` (Python 3.11-slim)
     - [x] Create `frontend/Dockerfile` (Node.js/Nginx)
-- [~] Task: Initialize Python Backend
+- [x] Task: Initialize Python Backend (990ca70)
     - [x] Setup `requirements.txt` with FastAPI, Uvicorn, SQLAlchemy, NetworkX, and GeoPandas
     - [x] Create basic `main.py` with a health check endpoint
-- [x] Task: Initialize React Frontend (PENDING)
+- [x] Task: Initialize React Frontend (990ca70)
     - [x] Scaffold React project with Vite, TypeScript, and Tailwind CSS
     - [x] Verify frontend connects to backend health check
 - [ ] Task: Conductor - User Manual Verification 'Project Scaffolding & Dockerization' (Protocol in workflow.md)
