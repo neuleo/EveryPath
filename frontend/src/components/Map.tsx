@@ -91,49 +91,53 @@ export const Map = ({ includeDeadEnds, onGraphFetched, onRouteGenerated }: MapPr
         'bottom-right'
       );
 
-      const updatePolygon = async () => {
-        const data = draw.current?.getAll();
-        if (data && data.features.length > 0) {
-          const feature = data.features[0];
-          if (feature.geometry.type === 'Polygon') {
-            try {
-              const coords = (feature.geometry as any).coordinates[0];
-              const response = await fetch('/api/fetch-osm', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ coordinates: coords })
-              });
-              const graphData = await response.json();
-              currentGraph.current = graphData;
-              onGraphFetched(graphData);
-              
-              const features = graphData.edges.map((edge: any) => {
-                const u = graphData.nodes.find((n: any) => n.id === edge.u);
-                const v = graphData.nodes.find((n: any) => n.id === edge.v);
-                return {
-                  type: 'Feature',
-                  geometry: {
-                    type: 'LineString',
-                    coordinates: [[u.lon, u.lat], [v.lon, v.lat]]
-                  },
-                  properties: edge.metadata
-                };
-              });
-              
-              const source = map.current?.getSource('osm-edges') as maplibregl.GeoJSONSource;
-              source?.setData({ type: 'FeatureCollection', features });
+    const updatePolygon = async () => {
+      const data = draw.current?.getAll();
+      console.log('Draw update event triggered', data);
+      if (data && data.features.length > 0) {
+        const feature = data.features[0];
+        if (feature.geometry.type === 'Polygon') {
+          try {
+            const coords = (feature.geometry as any).coordinates[0];
+            console.log('Fetching OSM for coords:', coords);
+            const response = await fetch('/api/fetch-osm', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ coordinates: coords })
+            });
+            const graphData = await response.json();
+            console.log('OSM Data received:', graphData);
+            currentGraph.current = graphData;
+            onGraphFetched(graphData);
+            
+            const features = graphData.edges.map((edge: any) => {
+              const u = graphData.nodes.find((n: any) => n.id === edge.u);
+              const v = graphData.nodes.find((n: any) => n.id === edge.v);
+              if (!u || !v) return null;
+              return {
+                type: 'Feature',
+                geometry: {
+                  type: 'LineString',
+                  coordinates: [[u.lon, u.lat], [v.lon, v.lat]]
+                },
+                properties: edge.metadata
+              };
+            }).filter((f: any) => f !== null);
+            
+            const source = map.current?.getSource('osm-edges') as maplibregl.GeoJSONSource;
+            source?.setData({ type: 'FeatureCollection', features });
 
-              // Clear route when new polygon drawn
-              const routeSource = map.current?.getSource('route') as maplibregl.GeoJSONSource;
-              routeSource?.setData({ type: 'FeatureCollection', features: [] });
-              onRouteGenerated([]);
+            // Clear route when new polygon drawn
+            const routeSource = map.current?.getSource('route') as maplibregl.GeoJSONSource;
+            routeSource?.setData({ type: 'FeatureCollection', features: [] });
+            onRouteGenerated([]);
 
-            } catch (err) {
-              console.error('OSM Fetch Error:', err);
-            }
+          } catch (err) {
+            console.error('OSM Fetch Error:', err);
           }
         }
-      };
+      }
+    };
 
       map.current.on('draw.create', updatePolygon);
       map.current.on('draw.update', updatePolygon);
