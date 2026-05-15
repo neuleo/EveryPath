@@ -4,5 +4,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: Foundation: Docker Setup and Core Routing API**
+- [~] **Track: Foundation: Docker Setup and Core Routing API**
   *Link: [./tracks/foundation_20260515/](./tracks/foundation_20260515/)*
