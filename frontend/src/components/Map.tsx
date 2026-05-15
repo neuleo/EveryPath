@@ -4,11 +4,18 @@ import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 
-export const Map = () => {
+interface MapProps {
+  includeDeadEnds: boolean;
+  onGraphFetched: (data: any) => void;
+  onRouteGenerated: (route: any[]) => void;
+}
+
+export const Map = ({ includeDeadEnds, onGraphFetched, onRouteGenerated }: MapProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const draw = useRef<MapboxDraw | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
+  const currentGraph = useRef<any>(null);
 
   useEffect(() => {
     if (map.current || !mapContainer.current) return;
@@ -26,7 +33,6 @@ export const Map = () => {
       map.current.on('load', () => {
         console.log('Map engine loaded');
         
-        // Setup drawing
         draw.current = new MapboxDraw({
           displayControlsDefault: false,
           controls: {
@@ -37,7 +43,7 @@ export const Map = () => {
         });
         map.current?.addControl(draw.current as any, 'top-right');
 
-        // Setup OSM Source
+        // OSM Source
         map.current?.addSource('osm-edges', {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] }
@@ -50,7 +56,24 @@ export const Map = () => {
           paint: {
             'line-color': '#00ffcc',
             'line-width': 2,
-            'line-opacity': 0.6
+            'line-opacity': 0.4
+          }
+        });
+
+        // Route Source
+        map.current?.addSource('route', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] }
+        });
+        map.current?.addLayer({
+          id: 'route-layer',
+          type: 'line',
+          source: 'route',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': '#3b82f6', // Bright blue for the final route
+            'line-width': 4,
+            'line-opacity': 0.8
           }
         });
       });
@@ -59,13 +82,10 @@ export const Map = () => {
         console.error('Map error:', e);
       });
 
-      // Add navigation and geolocation controls
       map.current.addControl(new maplibregl.NavigationControl(), 'bottom-right');
       map.current.addControl(
         new maplibregl.GeolocateControl({
-          positionOptions: {
-            enableHighAccuracy: true
-          },
+          positionOptions: { enableHighAccuracy: true },
           trackUserLocation: true
         }),
         'bottom-right'
@@ -84,6 +104,8 @@ export const Map = () => {
                 body: JSON.stringify({ coordinates: coords })
               });
               const graphData = await response.json();
+              currentGraph.current = graphData;
+              onGraphFetched(graphData);
               
               const features = graphData.edges.map((edge: any) => {
                 const u = graphData.nodes.find((n: any) => n.id === edge.u);
@@ -100,6 +122,12 @@ export const Map = () => {
               
               const source = map.current?.getSource('osm-edges') as maplibregl.GeoJSONSource;
               source?.setData({ type: 'FeatureCollection', features });
+
+              // Clear route when new polygon drawn
+              const routeSource = map.current?.getSource('route') as maplibregl.GeoJSONSource;
+              routeSource?.setData({ type: 'FeatureCollection', features: [] });
+              onRouteGenerated([]);
+
             } catch (err) {
               console.error('OSM Fetch Error:', err);
             }
@@ -120,6 +148,41 @@ export const Map = () => {
       map.current = null;
     };
   }, []);
+
+  // Expose function to generate route
+  useEffect(() => {
+    (window as any).generateRoute = async () => {
+      if (!currentGraph.current) return;
+      
+      try {
+        const response = await fetch('/api/generate-route', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nodes: currentGraph.current.nodes,
+            edges: currentGraph.current.edges,
+            include_dead_ends: includeDeadEnds
+          })
+        });
+        const data = await response.json();
+        onRouteGenerated(data.route);
+        
+        const routeCoords = data.route.map((node: any) => [node.lon, node.lat]);
+        const routeSource = map.current?.getSource('route') as maplibregl.GeoJSONSource;
+        routeSource?.setData({
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: routeCoords
+          },
+          properties: {}
+        } as any);
+
+      } catch (err) {
+        console.error('Route Generation Error:', err);
+      }
+    };
+  }, [includeDeadEnds, onRouteGenerated]);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>

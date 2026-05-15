@@ -6,6 +6,7 @@ import networkx as nx
 from routing import RoutingService
 from osm_service import OSMService
 from graph_service import GraphService
+from gpx_exporter import GPXExporter
 from database import get_db
 from models import Polygon
 from sqlalchemy.orm import Session
@@ -41,6 +42,9 @@ class RouteResponse(BaseModel):
 
 class PolygonRequest(BaseModel):
     coordinates: List[List[float]] # [[lon, lat], ...]
+
+class GPXRequest(BaseModel):
+    coordinates: List[List[float]] # [[lat, lon], ...]
 
 @app.get("/health", response_model=HealthCheck)
 async def health_check():
@@ -93,5 +97,21 @@ async def fetch_osm(data: PolygonRequest, db: Session = Depends(get_db)):
         graph_data = graph_service.convert_osm_to_graph(raw_osm)
         
         return graph_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/export-gpx")
+async def export_gpx(data: GPXRequest):
+    try:
+        exporter = GPXExporter()
+        coords = [tuple(c) for c in data.coordinates]
+        gpx_content = exporter.create_gpx(coords)
+        
+        from fastapi.responses import Response
+        return Response(
+            content=gpx_content,
+            media_type="application/gpx+xml",
+            headers={"Content-Disposition": "attachment; filename=everypath-route.gpx"}
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
