@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
+import { Map } from './components/Map'
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
   const [backendStatus, setBackendStatus] = useState<string>('Checking...')
 
   useEffect(() => {
@@ -12,34 +12,27 @@ function App() {
       .then(data => setBackendStatus(data.status))
       .catch(err => {
         console.error('Backend fetch error:', err)
-        setBackendStatus('Error connecting to backend')
+        setBackendStatus('Error')
       })
   }, [])
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center">
-        <h1 className="text-3xl font-bold text-blue-600 mb-4">EveryPath</h1>
-        <p className="text-gray-600 mb-6">
-          Scaffolded with Vite + React + TypeScript + Tailwind CSS
-        </p>
-        
-        <div className="mb-6">
-          <button
-            onClick={() => setCount((count) => count + 1)}
-            className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded transition-colors"
-          >
-            Count is {count}
-          </button>
-        </div>
+    <div className="relative h-screen w-screen overflow-hidden bg-gray-900">
+      {/* Map is the hero component */}
+      <Map />
 
-        <div className="p-4 bg-gray-50 rounded border border-gray-200">
-          <p className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-1">
-            Backend Status
-          </p>
-          <p className={`text-lg font-bold ${backendStatus === 'OK' ? 'text-green-500' : 'text-red-500'}`}>
-            {backendStatus}
-          </p>
+      {/* Overlay UI */}
+      <div className="absolute top-4 left-4 z-10">
+        <div className="bg-black/70 backdrop-blur-md p-4 rounded-lg shadow-xl border border-white/10 text-white max-w-xs">
+          <h1 className="text-2xl font-bold tracking-tighter mb-1">EveryPath</h1>
+          <p className="text-xs text-gray-400 mb-4 uppercase tracking-widest">Routing & Coverage</p>
+          
+          <div className="flex items-center space-x-2 bg-white/5 p-2 rounded">
+            <div className={`w-2 h-2 rounded-full ${backendStatus === 'OK' ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-red-500'}`} />
+            <p className="text-xs font-medium text-gray-300">
+              API: {backendStatus}
+            </p>
+          </div>
         </div>
       </div>
     </div>

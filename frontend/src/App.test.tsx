@@ -5,14 +5,28 @@ import App from './App'
 // Mock global fetch
 global.fetch = vi.fn()
 
+// Mock maplibre-gl
+vi.mock('maplibre-gl', () => {
+  const MapMock = vi.fn(function (this: any) {
+    this.on = vi.fn();
+    this.remove = vi.fn();
+  });
+  return {
+    default: {
+      Map: MapMock,
+    },
+    Map: MapMock,
+  };
+})
+
 test('renders EveryPath heading', () => {
   (fetch as any).mockResolvedValue({
     json: () => Promise.resolve({ status: 'OK' }),
   })
 
   render(<App />)
-  const linkElement = screen.getByText(/EveryPath/i)
-  expect(linkElement).toBeInTheDocument()
+  const heading = screen.getByText(/EveryPath/i)
+  expect(heading).toBeInTheDocument()
 })
 
 test('displays backend status OK when fetch is successful', async () => {
@@ -23,7 +37,7 @@ test('displays backend status OK when fetch is successful', async () => {
   render(<App />)
   
   await waitFor(() => {
-    expect(screen.getByText(/OK/i)).toBeInTheDocument()
+    expect(screen.getByText(/API: OK/i)).toBeInTheDocument()
   })
 })
 
@@ -33,6 +47,6 @@ test('displays error message when fetch fails', async () => {
   render(<App />)
   
   await waitFor(() => {
-    expect(screen.getByText(/Error connecting to backend/i)).toBeInTheDocument()
+    expect(screen.getByText(/API: Error/i)).toBeInTheDocument()
   })
 })
