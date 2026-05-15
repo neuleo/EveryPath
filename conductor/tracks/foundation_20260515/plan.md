@@ -33,9 +33,9 @@
 - [x] Task: Conductor - User Manual Verification 'Core Routing Service (CPP Foundation)' (f50f611)
 
 ## Phase 4: API & Export Foundation
-- [~] Task: Implement Route Generation API Endpoint
-    - [ ] Create POST endpoint that accepts a simple graph JSON and returns an Eulerian circuit
-- [ ] Task: Implement GPX Export Utility
+- [x] Task: Implement Route Generation API Endpoint (b04b152)
+    - [x] Create POST endpoint that accepts a simple graph JSON and returns an Eulerian circuit
+- [~] Task: Implement GPX Export Utility
     - [ ] Write unit tests for GPX XML generation
     - [ ] Implement utility to convert a list of coordinates into a `.gpx` file
 - [ ] Task: Conductor - User Manual Verification 'API & Export Foundation' (Protocol in workflow.md)
