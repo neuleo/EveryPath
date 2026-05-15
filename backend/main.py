@@ -46,6 +46,7 @@ class GraphData(BaseModel):
 
 class RouteResponse(BaseModel):
     route: List[Dict[str, Any]]
+    is_disconnected: bool = False
 
 class PolygonRequest(BaseModel):
     coordinates: List[List[float]] # [[lon, lat], ...]
@@ -76,12 +77,12 @@ async def generate_route(data: GraphData):
             G = service.filter_dead_ends(G)
         
         if G.number_of_nodes() == 0:
-             return {"route": []}
+             return {"route": [], "is_disconnected": False}
              
-        route_ids = service.solve_cpp(G)
+        route_ids, is_disconnected = service.solve_cpp(G)
         route_nodes = [node_map[node_id] for node_id in route_ids if node_id in node_map]
         
-        return {"route": route_nodes}
+        return {"route": route_nodes, "is_disconnected": is_disconnected}
     except Exception as e:
         logger.error(f"Error in generate_route: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -23,9 +23,9 @@ def load_spatialite(dbapi_conn, connection_record):
         except Exception:
             continue
     # If we reach here, we couldn't load the extension
-    # We don't raise here to allow non-spatial operations if needed, 
-    # but spatial queries will fail later.
-    pass
+    raise RuntimeError(
+        "Could not load SpatiaLite extension. tried paths: " + ", ".join(paths)
+    )
 
 event.listen(engine, "connect", load_spatialite)
 

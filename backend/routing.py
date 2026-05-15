@@ -29,13 +29,15 @@ class RoutingService:
     def solve_cpp(self, G: nx.Graph):
         """
         Solves the Chinese Postman Problem (CPP) for an undirected graph.
-        Returns a list of nodes representing the Eulerian circuit.
+        Returns a tuple of (list of nodes, is_disconnected flag).
         """
+        is_disconnected = False
         if not nx.is_connected(G):
+            is_disconnected = True
             # If not connected, solve for the largest component
             components = list(nx.connected_components(G))
             if not components:
-                return []
+                return [], False
             largest_comp = max(components, key=len)
             G = G.subgraph(largest_comp).copy()
 
@@ -44,7 +46,7 @@ class RoutingService:
         if not odd_nodes:
             # Graph is already Eulerian
             edges = list(nx.eulerian_circuit(G, source=list(G.nodes())[0]))
-            return self._edges_to_nodes(edges)
+            return self._edges_to_nodes(edges), is_disconnected
         
         # 1. Calculate all pairs shortest paths between odd nodes
         odd_node_pairs = list(itertools.combinations(odd_nodes, 2))
@@ -71,4 +73,4 @@ class RoutingService:
         
         # 4. Find Eulerian circuit
         edges = list(nx.eulerian_circuit(augmented_G, source=list(G.nodes())[0]))
-        return self._edges_to_nodes(edges)
+        return self._edges_to_nodes(edges), is_disconnected

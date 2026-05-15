@@ -1,13 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import maplibregl from 'maplibre-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
+import type { OSMNode, OSMEdge, GraphData, RouteResponse } from '../types';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 
 interface MapProps {
   includeDeadEnds: boolean;
-  onGraphFetched: (data: any) => void;
-  onRouteGenerated: (route: any[]) => void;
+  onGraphFetched: (data: GraphData) => void;
+  onRouteGenerated: (route: OSMNode[]) => void;
 }
 
 const drawStyles = [
@@ -89,12 +90,18 @@ const drawStyles = [
   }
 ];
 
-export const Map = ({ includeDeadEnds, onGraphFetched, onRouteGenerated }: MapProps) => {
+export interface MapRef {
+  generateRoute: () => Promise<void>;
+  resetMap: () => void;
+}
+
+export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetched, onRouteGenerated }, ref) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const draw = useRef<MapboxDraw | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
-  const currentGraph = useRef<any>(null);
+  const [warning, setWarning] = useState<string | null>(null);
+  const currentGraph = useRef<GraphData | null>(null);
 
   const propsRef = useRef({ onGraphFetched, onRouteGenerated, includeDeadEnds });
   useEffect(() => {
@@ -168,13 +175,14 @@ export const Map = ({ includeDeadEnds, onGraphFetched, onRouteGenerated }: MapPr
                   throw new Error(errData.detail || 'Server error fetching OSM data');
                 }
                 
-                const graphData = await response.json();
+                const graphData: GraphData = await response.json();
                 currentGraph.current = graphData;
                 propsRef.current.onGraphFetched(graphData);
+                setWarning(null);
                 
-                const features = graphData.edges.map((edge: any) => {
-                  const u = graphData.nodes.find((n: any) => n.id === edge.u);
-                  const v = graphData.nodes.find((n: any) => n.id === edge.v);
+                const features = graphData.edges.map((edge: OSMEdge) => {
+                  const u = graphData.nodes.find((n: OSMNode) => n.id === edge.u);
+                  const v = graphData.nodes.find((n: OSMNode) => n.id === edge.v);
                   if (!u || !v) return null;
                   return {
                     type: 'Feature',
@@ -243,8 +251,8 @@ export const Map = ({ includeDeadEnds, onGraphFetched, onRouteGenerated }: MapPr
     };
   }, []);
 
-  useEffect(() => {
-    (window as any).generateRoute = async () => {
+  useImperativeHandle(ref, () => ({
+    generateRoute: async () => {
       if (!currentGraph.current || !map.current) return;
       try {
         const response = await fetch('/api/generate-route', {
@@ -256,22 +264,30 @@ export const Map = ({ includeDeadEnds, onGraphFetched, onRouteGenerated }: MapPr
             include_dead_ends: propsRef.current.includeDeadEnds
           })
         });
-        const data = await response.json();
+        const data: RouteResponse = await response.json();
         propsRef.current.onRouteGenerated(data.route);
-        const routeCoords = data.route.map((node: any) => [node.lon, node.lat]);
+        
+        if (data.is_disconnected) {
+          setWarning("Teile des Polygons sind nicht erreichbar. Die Route deckt nur den größten zusammenhängenden Teil ab.");
+        } else {
+          setWarning(null);
+        }
+
+        const routeCoords = data.route.map((node: OSMNode) => [node.lon, node.lat]);
         const routeSource = map.current?.getSource('route') as maplibregl.GeoJSONSource;
         routeSource?.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: routeCoords }, properties: {} } as any);
       } catch (err: any) {
         console.error('Map: Route Error:', err);
         setMapError(err.message);
       }
-    };
-
-    (window as any).resetMap = () => {
+    },
+    resetMap: () => {
       if (draw.current) {
         draw.current.deleteAll();
+        draw.current.changeMode('draw_polygon');
         // Trigger manual update because deleteAll() doesn't fire events
         currentGraph.current = null;
+        setWarning(null);
         propsRef.current.onGraphFetched({ nodes: [], edges: [] });
         propsRef.current.onRouteGenerated([]);
         
@@ -282,8 +298,8 @@ export const Map = ({ includeDeadEnds, onGraphFetched, onRouteGenerated }: MapPr
           routeSource?.setData({ type: 'FeatureCollection', features: [] });
         }
       }
-    };
-  }, []); 
+    }
+  }));
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -293,6 +309,12 @@ export const Map = ({ includeDeadEnds, onGraphFetched, onRouteGenerated }: MapPr
           {mapError}
         </div>
       )}
+      {warning && (
+        <div style={{ position: 'absolute', top: '40px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#fbb03b', color: 'black', padding: '12px 24px', borderRadius: '8px', zIndex: 1000, boxShadow: '0 4px 12px rgba(0,0,0,0.5)', fontWeight: 'bold', maxWidth: '80%', textAlign: 'center' }}>
+          {warning}
+          <button onClick={() => setWarning(null)} style={{ marginLeft: '16px', border: 'none', background: 'rgba(0,0,0,0.1)', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px' }}>OK</button>
+        </div>
+      )}
     </div>
   );
-};
+});

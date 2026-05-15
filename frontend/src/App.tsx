@@ -1,13 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Map } from './components/Map'
+import type { MapRef } from './components/Map'
+import type { OSMNode } from './types'
 import './index.css'
 
 function App() {
+  const mapRef = useRef<MapRef>(null)
   const [backendStatus, setBackendStatus] = useState<string>('Checking...')
   const [includeDeadEnds, setIncludeDeadEnds] = useState(true)
   const [hasGraph, setHasGraph] = useState(false)
   const [edgeCount, setEdgeCount] = useState(0)
-  const [route, setRoute] = useState<any[]>([])
+  const [route, setRoute] = useState<OSMNode[]>([])
 
   useEffect(() => {
     fetch('/api/health')
@@ -20,15 +23,11 @@ function App() {
   }, [])
 
   const handleGenerateRoute = () => {
-    if ((window as any).generateRoute) {
-      (window as any).generateRoute();
-    }
+    mapRef.current?.generateRoute();
   }
 
   const handleReset = () => {
-    if ((window as any).resetMap) {
-      (window as any).resetMap();
-    }
+    mapRef.current?.resetMap();
   }
 
   const handleDownloadGPX = async () => {
@@ -56,97 +55,91 @@ function App() {
   }
 
   return (
-    <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', backgroundColor: '#0f172a' }}>
-      {/* Map Header Overlay */}
-      <div style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 100, pointerEvents: 'none' }}>
-        <div style={{ backgroundColor: 'rgba(0,0,0,0.85)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', color: 'white', pointerEvents: 'auto', backdropFilter: 'blur(10px)', width: '240px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+    <div className="h-screen w-screen flex flex-col bg-slate-900 relative">
+      {/* Responsive Overlay */}
+      <div className="absolute top-4 left-4 right-4 md:right-auto md:w-80 z-[100] pointer-events-none">
+        <div className="bg-black/85 p-5 md:p-6 rounded-2xl border border-white/10 text-white pointer-events-auto backdrop-blur-md shadow-2xl">
+          <div className="flex justify-between items-start mb-4">
             <div>
-              <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#fff' }}>EveryPath</h1>
-              <p style={{ margin: '4px 0 20px 0', fontSize: '10px', opacity: 0.5, letterSpacing: '2px', textTransform: 'uppercase' }}>Routing & Coverage</p>
+              <h1 className="m-0 text-2xl md:text-3xl font-bold text-white tracking-tight">EveryPath</h1>
+              <p className="m-0 mt-1 text-[10px] md:text-xs opacity-50 tracking-widest uppercase font-semibold">Routing & Coverage</p>
             </div>
             {hasGraph && (
               <button 
                 onClick={handleReset}
                 title="Auswahl löschen"
-                style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#ef4444', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', cursor: 'pointer', fontWeight: 'bold' }}
+                className="bg-red-500/10 border border-red-500/20 text-red-500 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer hover:bg-red-500/20 transition-colors"
               >
                 LÖSCHEN
               </button>
             )}
           </div>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-               <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: backendStatus === 'OK' ? '#22c55e' : '#ef4444' }} />
-               <span style={{ fontSize: '12px', opacity: 0.8 }}>API: {backendStatus}</span>
-            </div>
-
-            <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.1)' }} />
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => setIncludeDeadEnds(!includeDeadEnds)}>
-              <div style={{ width: '40px', height: '20px', backgroundColor: includeDeadEnds ? '#3b82f6' : '#334155', borderRadius: '20px', position: 'relative', transition: '0.2s' }}>
-                <div style={{ width: '16px', height: '16px', backgroundColor: 'white', borderRadius: '50%', position: 'absolute', top: '2px', left: includeDeadEnds ? '22px' : '2px', transition: '0.2s' }} />
+          <div className="flex flex-col gap-4">
+            {/* Status & Options */}
+            <div className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5">
+              <div className="flex items-center gap-2">
+                 <div className={`w-2.5 h-2.5 rounded-full ${backendStatus === 'OK' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500'}`} />
+                 <span className="text-xs font-medium text-slate-300">API</span>
               </div>
-              <span style={{ fontSize: '13px' }}>Sackgassen</span>
+              <div className="text-xs font-medium text-slate-400">
+                Segmente: <span className={edgeCount > 0 ? 'text-green-400 font-bold' : 'text-slate-300'}>{edgeCount}</span>
+              </div>
             </div>
 
-            <div style={{ fontSize: '11px', opacity: 0.6 }}>
-               Segmente gefunden: <span style={{ color: edgeCount > 0 ? '#22c55e' : 'inherit', fontWeight: 'bold' }}>{edgeCount}</span>
-            </div>
-
-            <button 
-              onClick={handleGenerateRoute}
-              disabled={!hasGraph}
-              style={{ 
-                width: '100%', 
-                backgroundColor: hasGraph ? '#3b82f6' : '#1e293b', 
-                color: hasGraph ? 'white' : '#64748b', 
-                border: 'none', 
-                padding: '12px', 
-                borderRadius: '8px', 
-                fontWeight: 'bold', 
-                cursor: hasGraph ? 'pointer' : 'not-allowed',
-                transition: '0.2s'
-              }}
+            <div 
+              className="flex items-center justify-between cursor-pointer group" 
+              onClick={() => setIncludeDeadEnds(!includeDeadEnds)}
             >
-              Route berechnen
-            </button>
+              <span className="text-sm font-medium text-slate-200 group-hover:text-white transition-colors">Sackgassen einbeziehen</span>
+              <div className={`w-10 h-5 rounded-full relative transition-colors duration-200 ease-in-out ${includeDeadEnds ? 'bg-blue-500' : 'bg-slate-700'}`}>
+                <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-all duration-200 ease-in-out ${includeDeadEnds ? 'left-[22px]' : 'left-0.5'}`} />
+              </div>
+            </div>
 
-            {route.length > 0 && (
+            {/* Actions */}
+            <div className="pt-2 flex flex-col gap-3">
               <button 
-                onClick={handleDownloadGPX}
-                style={{ 
-                  width: '100%', 
-                  backgroundColor: '#10b981', 
-                  color: 'white', 
-                  border: 'none', 
-                  padding: '12px', 
-                  borderRadius: '8px', 
-                  fontWeight: 'bold', 
-                  cursor: 'pointer',
-                  transition: '0.2s'
-                }}
+                onClick={handleGenerateRoute}
+                disabled={!hasGraph}
+                className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all duration-200 shadow-lg ${
+                  hasGraph 
+                    ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/50' 
+                    : 'bg-slate-800 text-slate-500 cursor-not-allowed shadow-none'
+                }`}
               >
-                GPX Exportieren
+                Route berechnen
               </button>
-            )}
+
+              {route.length > 0 && (
+                <button 
+                  onClick={handleDownloadGPX}
+                  className="w-full py-3.5 rounded-xl font-bold text-sm bg-emerald-500 hover:bg-emerald-400 text-white transition-colors shadow-lg shadow-emerald-900/50"
+                >
+                  GPX Exportieren
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      <Map 
-        includeDeadEnds={includeDeadEnds} 
-        onGraphFetched={(data) => {
-          setEdgeCount(data.edges.length);
-          setHasGraph(data.edges.length > 0);
-        }}
-        onRouteGenerated={(r) => {
-          setRoute(r);
-        }}
-      />
+      <div className="flex-1 relative">
+        <Map 
+          ref={mapRef}
+          includeDeadEnds={includeDeadEnds} 
+          onGraphFetched={(data) => {
+            setEdgeCount(data.edges.length);
+            setHasGraph(data.edges.length > 0);
+          }}
+          onRouteGenerated={(r) => {
+            setRoute(r);
+          }}
+        />
+      </div>
     </div>
   )
+
 }
 
 export default App

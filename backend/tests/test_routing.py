@@ -13,9 +13,10 @@ def test_find_eulerian_circuit_simple(routing_service):
     G.add_edge(2, 3, weight=1)
     G.add_edge(3, 0, weight=1)
     
-    circuit = routing_service.solve_cpp(G)
+    circuit, is_disconnected = routing_service.solve_cpp(G)
     assert len(circuit) == 5
     assert circuit[0] == circuit[-1]
+    assert is_disconnected is False
 
 def test_solve_cpp_non_eulerian(routing_service):
     # 0 -- 1 -- 2
@@ -23,11 +24,12 @@ def test_solve_cpp_non_eulerian(routing_service):
     G.add_edge(0, 1, weight=10)
     G.add_edge(1, 2, weight=10)
     
-    circuit = routing_service.solve_cpp(G)
+    circuit, is_disconnected = routing_service.solve_cpp(G)
     assert len(circuit) == 5
     # Should be 0-1-2-1-0 or similar
     assert set(circuit) == {0, 1, 2}
     assert circuit.count(1) == 2
+    assert is_disconnected is False
 
 def test_filter_dead_ends(routing_service):
     # 0 -- 1 -- 2 (dead end)
