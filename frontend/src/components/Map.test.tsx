@@ -32,6 +32,11 @@ vi.mock('@mapbox/mapbox-gl-draw', () => {
 })
 
 test('Map component renders without crashing', () => {
-  const { container } = render(<Map />)
+  const dummyProps = {
+    includeDeadEnds: true,
+    onGraphFetched: vi.fn(),
+    onRouteGenerated: vi.fn()
+  };
+  const { container } = render(<Map {...dummyProps} />)
   expect(container.firstChild).toBeInTheDocument()
 })

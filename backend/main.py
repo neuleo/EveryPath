@@ -67,7 +67,8 @@ async def generate_route(data: GraphData):
     try:
         G = nx.Graph()
         node_map = {n["id"]: n for n in data.nodes}
-        G.add_nodes_from(node_map.keys())
+        for n in data.nodes:
+            G.add_node(n["id"], lat=n["lat"], lon=n["lon"])
         for edge in data.edges:
             G.add_edge(edge.u, edge.v, weight=edge.weight)
         

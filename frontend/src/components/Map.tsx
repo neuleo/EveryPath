@@ -101,7 +101,8 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
   const draw = useRef<MapboxDraw | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
-  const currentGraph = useRef<GraphData | null>(null);
+  const currentGraph = useRef<any>(null);
+  const animationRef = useRef<number | null>(null);
 
   const propsRef = useRef({ onGraphFetched, onRouteGenerated, includeDeadEnds });
   useEffect(() => {
@@ -154,6 +155,23 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
             source: 'route',
             layout: { 'line-cap': 'round', 'line-join': 'round' },
             paint: { 'line-color': '#3b82f6', 'line-width': 4, 'line-opacity': 0.8 }
+          });
+          m.addLayer({
+            id: 'route-arrows',
+            type: 'symbol',
+            source: 'route',
+            layout: {
+              'symbol-placement': 'line',
+              'text-field': '▶',
+              'text-size': 18,
+              'symbol-spacing': 50,
+              'text-keep-upright': false
+            },
+            paint: {
+              'text-color': '#ffffff',
+              'text-halo-color': '#1e40af',
+              'text-halo-width': 1
+            }
           });
         });
 
@@ -209,6 +227,7 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
                 const source = m.getSource('osm-edges') as maplibregl.GeoJSONSource;
                 source?.setData({ type: 'FeatureCollection', features });
 
+                if (animationRef.current) cancelAnimationFrame(animationRef.current);
                 const routeSource = m.getSource('route') as maplibregl.GeoJSONSource;
                 routeSource?.setData({ type: 'FeatureCollection', features: [] });
                 propsRef.current.onRouteGenerated([]);
@@ -233,6 +252,7 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
         const clearMap = () => {
           if (debounceTimer) clearTimeout(debounceTimer);
           if (fetchAbortController) fetchAbortController.abort();
+          if (animationRef.current) cancelAnimationFrame(animationRef.current);
           
           currentGraph.current = null;
           propsRef.current.onGraphFetched({ nodes: [], edges: [] });
@@ -313,13 +333,44 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
 
         const routeCoords = data.route.map((node: OSMNode) => [node.lon, node.lat]);
         const routeSource = map.current?.getSource('route') as maplibregl.GeoJSONSource;
-        routeSource?.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: routeCoords }, properties: {} } as any);
+        
+        if (animationRef.current) cancelAnimationFrame(animationRef.current);
+        
+        let progress = 0;
+        const totalNodes = routeCoords.length;
+        // Adjust speed based on route length (target ~2 seconds for animation)
+        const drawStep = Math.max(1, Math.floor(totalNodes / 120)); 
+        
+        const animateLine = () => {
+          progress += drawStep;
+          if (progress > totalNodes) progress = totalNodes;
+          
+          routeSource?.setData({
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: routeCoords.slice(0, progress)
+            },
+            properties: {}
+          } as any);
+          
+          if (progress < totalNodes) {
+             animationRef.current = requestAnimationFrame(animateLine);
+          }
+        };
+        
+        if (totalNodes > 0) {
+          animateLine();
+        } else {
+          routeSource?.setData({ type: 'FeatureCollection', features: [] });
+        }
       } catch (err: any) {
         console.error('Map: Route Error:', err);
         setMapError(err.message);
       }
     },
     resetMap: () => {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
       if (draw.current) {
         draw.current.deleteAll();
         draw.current.changeMode('draw_polygon');

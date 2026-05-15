@@ -80,7 +80,7 @@ function App() {
             <div className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5">
               <div className="flex items-center gap-2">
                  <div className={`w-2.5 h-2.5 rounded-full ${backendStatus === 'OK' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500'}`} />
-                 <span className="text-xs font-medium text-slate-300">API</span>
+                 <span className="text-xs font-medium text-slate-300">API: {backendStatus}</span>
               </div>
               <div className="text-xs font-medium text-slate-400">
                 Segmente: <span className={edgeCount > 0 ? 'text-green-400 font-bold' : 'text-slate-300'}>{edgeCount}</span>
