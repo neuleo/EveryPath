@@ -24,12 +24,12 @@
 - [x] Task: Conductor - User Manual Verification 'Database & SpatiaLite Integration' (dd0f3d7)
 
 ## Phase 3: Core Routing Service (CPP Foundation)
-- [~] Task: Write Tests for CPP Routing Service
-    - [ ] Create test case with a simple Eulerian graph (4 nodes, 4 edges)
-    - [ ] Create test case with a non-Eulerian graph requiring edge augmentation
-- [ ] Task: Implement Routing Service Skeleton
-    - [ ] Implement service using NetworkX to identify odd-degree nodes
-    - [ ] Implement logic for minimum weight perfect matching on odd nodes
+- [x] Task: Write Tests for CPP Routing Service (f8ee2bd)
+    - [x] Create test case with a simple Eulerian graph (4 nodes, 4 edges)
+    - [x] Create test case with a non-Eulerian graph requiring edge augmentation
+- [x] Task: Implement Routing Service Skeleton (f8ee2bd)
+    - [x] Implement service using NetworkX to identify odd-degree nodes
+    - [x] Implement logic for minimum weight perfect matching on odd nodes
 - [ ] Task: Conductor - User Manual Verification 'Core Routing Service (CPP Foundation)' (Protocol in workflow.md)
 
 ## Phase 4: API & Export Foundation
