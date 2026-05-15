@@ -35,7 +35,7 @@
 ## Phase 4: API & Export Foundation
 - [x] Task: Implement Route Generation API Endpoint (b04b152)
     - [x] Create POST endpoint that accepts a simple graph JSON and returns an Eulerian circuit
-- [~] Task: Implement GPX Export Utility
-    - [ ] Write unit tests for GPX XML generation
-    - [ ] Implement utility to convert a list of coordinates into a `.gpx` file
+- [x] Task: Implement GPX Export Utility (7244744)
+    - [x] Write unit tests for GPX XML generation
+    - [x] Implement utility to convert a list of coordinates into a `.gpx` file
 - [ ] Task: Conductor - User Manual Verification 'API & Export Foundation' (Protocol in workflow.md)
