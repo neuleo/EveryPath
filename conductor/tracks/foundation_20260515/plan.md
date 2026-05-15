@@ -24,7 +24,7 @@
 - [x] Task: Conductor - User Manual Verification 'Database & SpatiaLite Integration' (dd0f3d7)
 
 ## Phase 3: Core Routing Service (CPP Foundation)
-- [ ] Task: Write Tests for CPP Routing Service
+- [~] Task: Write Tests for CPP Routing Service
     - [ ] Create test case with a simple Eulerian graph (4 nodes, 4 edges)
     - [ ] Create test case with a non-Eulerian graph requiring edge augmentation
 - [ ] Task: Implement Routing Service Skeleton
