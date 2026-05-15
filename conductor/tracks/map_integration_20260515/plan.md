@@ -1,6 +1,6 @@
 # Implementation Plan - Map Integration and OSM Data Fetching
 
-## Phase 1: Frontend Map Setup
+## Phase 1: Frontend Map Setup [checkpoint: c2f7777]
 - [x] Task: Install MapLibre GL JS and basic setup
 - [x] Task: Implement High-Contrast Dark Mode map style
 - [x] Task: Integrate Polygon Drawing tool
