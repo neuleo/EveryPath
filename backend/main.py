@@ -133,7 +133,7 @@ async def fetch_osm(data: PolygonRequest, db: Session = Depends(get_db)):
         if not elements:
             return {"nodes": [], "edges": []}
 
-        graph_data = graph_service.convert_osm_to_graph(raw_osm)
+        graph_data = graph_service.convert_osm_to_graph(raw_osm, polygon=shapely_poly)
         logger.info(f"Converted to graph with {len(graph_data['edges'])} edges")
         
         return graph_data

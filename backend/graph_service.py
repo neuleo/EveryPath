@@ -1,5 +1,6 @@
 import math
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
+from shapely.geometry import Polygon, Point
 
 class GraphService:
     def haversine_distance(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -15,9 +16,10 @@ class GraphService:
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
         return R * c
 
-    def convert_osm_to_graph(self, osm_data: Dict[str, Any]) -> Dict[str, Any]:
+    def convert_osm_to_graph(self, osm_data: Dict[str, Any], polygon: Optional[Polygon] = None) -> Dict[str, Any]:
         """
         Converts OSM JSON data into a graph format (nodes and edges).
+        If polygon is provided, strictly filters edges to those where at least one node is inside.
         """
         nodes = {}
         for element in osm_data.get("elements", []):
@@ -44,6 +46,15 @@ class GraphService:
                         u = nodes[u_id]
                         v = nodes[v_id]
                         
+                        if polygon is not None:
+                            # Mapbox uses lon, lat
+                            p_u = Point(u["lon"], u["lat"])
+                            p_v = Point(v["lon"], v["lat"])
+                            # Add an edge if at least one of its nodes is within or touches the polygon.
+                            # Using buffer to allow small tolerance.
+                            if not (polygon.intersects(p_u) or polygon.intersects(p_v)):
+                                continue
+                        
                         weight = self.haversine_distance(u["lat"], u["lon"], v["lat"], v["lon"])
                         
                         edges.append({
@@ -59,3 +70,4 @@ class GraphService:
             "nodes": [nodes[node_id] for node_id in graph_nodes],
             "edges": edges
         }
+

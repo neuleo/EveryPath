@@ -48,7 +48,7 @@ def test_fetch_osm():
     from httpx import Response
     
     with respx.mock:
-        respx.post("https://overpass-api.de/api/interpreter").mock(return_value=Response(200, json=mock_osm))
+        respx.post("https://lz4.overpass-api.de/api/interpreter").mock(return_value=Response(200, json=mock_osm))
         
         response = client.post("/fetch-osm", json={"coordinates": [[11.5, 48.1], [11.5, 48.2], [11.6, 48.2]]})
         assert response.status_code == 200

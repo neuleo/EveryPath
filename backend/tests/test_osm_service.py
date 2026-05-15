@@ -18,7 +18,7 @@ async def test_fetch_osm_data_basic():
     }
     
     with respx.mock:
-        respx.post("https://overpass-api.de/api/interpreter").mock(return_value=Response(200, json=mock_response))
+        respx.post("https://lz4.overpass-api.de/api/interpreter").mock(return_value=Response(200, json=mock_response))
         
         data = await service.fetch_within_polygon(polygon_coords)
         
