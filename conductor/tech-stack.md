@@ -18,7 +18,7 @@
 
 ## Database
 - **Engine:** SQLite with **SpatiaLite** extension.
-- **Rationale:** Portability is the priority. The entire application state (users, polygons, coverage history) is stored in a single `.sqlite` file, allowing the instance to be easily backed up or moved between machines.
+- **Rationale:** Portability is the priority. The entire application state (users, polygons, coverage history) is stored in a single `.sqlite` file in the root `/data` directory, allowing the instance to be easily backed up or moved between machines.
 
 ## Infrastructure & DevOps
 - **Containerization:** Docker & Docker Compose.
