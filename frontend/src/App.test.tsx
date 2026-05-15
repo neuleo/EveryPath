@@ -53,6 +53,7 @@ test('displays backend status OK when fetch is successful', async () => {
   await waitFor(() => {
     expect(screen.getByText(/API: OK/i)).toBeInTheDocument()
   })
+  expect(fetch).toHaveBeenCalledWith('/api/health')
 })
 
 test('displays error message when fetch fails', async () => {

@@ -6,8 +6,7 @@ function App() {
   const [backendStatus, setBackendStatus] = useState<string>('Checking...')
 
   useEffect(() => {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
-    fetch(`${apiUrl}/health`)
+    fetch('/api/health')
       .then(res => res.json())
       .then(data => setBackendStatus(data.status))
       .catch(err => {
