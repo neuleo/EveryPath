@@ -6,6 +6,7 @@ function App() {
   const [backendStatus, setBackendStatus] = useState<string>('Checking...')
   const [includeDeadEnds, setIncludeDeadEnds] = useState(true)
   const [hasGraph, setHasGraph] = useState(false)
+  const [edgeCount, setEdgeCount] = useState(0)
   const [route, setRoute] = useState<any[]>([])
 
   useEffect(() => {
@@ -52,7 +53,7 @@ function App() {
     <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', backgroundColor: '#0f172a' }}>
       {/* Map Header Overlay */}
       <div style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 100, pointerEvents: 'none' }}>
-        <div style={{ backgroundColor: 'rgba(0,0,0,0.85)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', color: 'white', pointerEvents: 'auto', backdropFilter: 'blur(10px)' }}>
+        <div style={{ backgroundColor: 'rgba(0,0,0,0.85)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', color: 'white', pointerEvents: 'auto', backdropFilter: 'blur(10px)', width: '240px' }}>
           <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#fff' }}>EveryPath</h1>
           <p style={{ margin: '4px 0 20px 0', fontSize: '10px', opacity: 0.5, letterSpacing: '2px', textTransform: 'uppercase' }}>Routing & Coverage</p>
           
@@ -68,7 +69,11 @@ function App() {
               <div style={{ width: '40px', height: '20px', backgroundColor: includeDeadEnds ? '#3b82f6' : '#334155', borderRadius: '20px', position: 'relative', transition: '0.2s' }}>
                 <div style={{ width: '16px', height: '16px', backgroundColor: 'white', borderRadius: '50%', position: 'absolute', top: '2px', left: includeDeadEnds ? '22px' : '2px', transition: '0.2s' }} />
               </div>
-              <span style={{ fontSize: '13px' }}>Sackgassen einbeziehen</span>
+              <span style={{ fontSize: '13px' }}>Sackgassen</span>
+            </div>
+
+            <div style={{ fontSize: '11px', opacity: 0.6 }}>
+               Segmente gefunden: <span style={{ color: edgeCount > 0 ? '#22c55e' : 'inherit', fontWeight: 'bold' }}>{edgeCount}</span>
             </div>
 
             <button 
@@ -113,8 +118,15 @@ function App() {
 
       <Map 
         includeDeadEnds={includeDeadEnds} 
-        onGraphFetched={(data) => setHasGraph(data.edges.length > 0)}
-        onRouteGenerated={(r) => setRoute(r)}
+        onGraphFetched={(data) => {
+          console.log('App: Graph data received with', data.edges.length, 'edges');
+          setEdgeCount(data.edges.length);
+          setHasGraph(data.edges.length > 0);
+        }}
+        onRouteGenerated={(r) => {
+          console.log('App: Route received with', r.length, 'nodes');
+          setRoute(r);
+        }}
       />
     </div>
   )

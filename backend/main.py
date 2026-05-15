@@ -1,17 +1,24 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
 from typing import List, Dict, Any
 import networkx as nx
+from sqlalchemy.orm import Session
+from shapely.geometry import Polygon as ShapelyPolygon
+import traceback
+import logging
+
 from routing import RoutingService
 from osm_service import OSMService
 from graph_service import GraphService
 from gpx_exporter import GPXExporter
 from database import get_db
 from models import Polygon
-from sqlalchemy.orm import Session
-from fastapi import Depends
-from shapely.geometry import Polygon as ShapelyPolygon
+
+# Logging setup
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="EveryPath API")
 
@@ -76,29 +83,64 @@ async def generate_route(data: GraphData):
         
         return {"route": route_nodes}
     except Exception as e:
+        logger.error(f"Error in generate_route: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/fetch-osm")
 async def fetch_osm(data: PolygonRequest, db: Session = Depends(get_db)):
     try:
+        logger.info(f"Received fetch-osm request with {len(data.coordinates)} points")
+        if len(data.coordinates) < 3:
+            raise HTTPException(status_code=400, detail="Polygon must have at least 3 points")
+
         # Mapbox/GeoJSON uses [lon, lat], OSMService expects [(lat, lon), ...]
         polygon_coords = [(c[1], c[0]) for c in data.coordinates]
         
         # Save polygon to DB
-        shapely_poly = ShapelyPolygon(data.coordinates)
-        db_poly = Polygon(geom_wkt=shapely_poly.wkt)
-        db.add(db_poly)
-        db.commit()
+        try:
+            shell = list(data.coordinates)
+            if shell[0] != shell[-1]:
+                shell.append(shell[0])
+                
+            shapely_poly = ShapelyPolygon(shell)
+            if not shapely_poly.is_valid:
+                logger.warning("Polygon is invalid, attempting to fix with buffer(0)")
+                shapely_poly = shapely_poly.buffer(0)
+
+            db_poly = Polygon(geom_wkt=shapely_poly.wkt)
+            db.add(db_poly)
+            db.commit()
+            logger.info(f"Polygon saved to database: {db_poly.id}")
+        except Exception as poly_err:
+            logger.error(f"Error saving polygon: {poly_err}")
+            db.rollback()
         
         osm_service = OSMService()
         graph_service = GraphService()
         
-        raw_osm = await osm_service.fetch_within_polygon(polygon_coords)
+        logger.info("Fetching from Overpass...")
+        try:
+            raw_osm = await osm_service.fetch_within_polygon(polygon_coords)
+        except Exception as osm_err:
+            logger.error(f"Overpass API error: {osm_err}")
+            raise HTTPException(status_code=502, detail=f"OSM Service error: {str(osm_err)}")
+
+        elements = raw_osm.get('elements', [])
+        logger.info(f"Overpass returned {len(elements)} elements")
+        
+        if not elements:
+            return {"nodes": [], "edges": []}
+
         graph_data = graph_service.convert_osm_to_graph(raw_osm)
+        logger.info(f"Converted to graph with {len(graph_data['edges'])} edges")
         
         return graph_data
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Fatal error in fetch_osm: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 @app.post("/export-gpx")
 async def export_gpx(data: GPXRequest):
@@ -107,11 +149,11 @@ async def export_gpx(data: GPXRequest):
         coords = [tuple(c) for c in data.coordinates]
         gpx_content = exporter.create_gpx(coords)
         
-        from fastapi.responses import Response
         return Response(
             content=gpx_content,
             media_type="application/gpx+xml",
             headers={"Content-Disposition": "attachment; filename=everypath-route.gpx"}
         )
     except Exception as e:
+        logger.error(f"Error in export_gpx: {e}")
         raise HTTPException(status_code=500, detail=str(e))

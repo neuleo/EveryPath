@@ -26,7 +26,11 @@ class OSMService:
         Fetches OSM data within the specified polygon.
         """
         query = self._build_query(polygon_coords)
-        async with httpx.AsyncClient() as client:
-            response = await client.post(self.overpass_url, data={"data": query})
+        headers = {
+            "User-Agent": "EveryPath/1.0 (https://everypath-test.neuleo.de)",
+            "Referer": "https://everypath-test.neuleo.de"
+        }
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(self.overpass_url, data={"data": query}, headers=headers)
             response.raise_for_status()
             return response.json()
