@@ -4,6 +4,8 @@ from pydantic import BaseModel
 from typing import List, Dict, Any
 import networkx as nx
 from routing import RoutingService
+from osm_service import OSMService
+from graph_service import GraphService
 
 app = FastAPI(title="EveryPath API")
 
@@ -31,6 +33,9 @@ class GraphData(BaseModel):
 class RouteResponse(BaseModel):
     route: List[int]
 
+class PolygonRequest(BaseModel):
+    coordinates: List[List[float]] # [[lon, lat], ...]
+
 @app.get("/health", response_model=HealthCheck)
 async def health_check():
     return {"status": "OK"}
@@ -53,5 +58,21 @@ async def generate_route(data: GraphData):
         service = RoutingService()
         route = service.solve_cpp(G)
         return {"route": route}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/fetch-osm")
+async def fetch_osm(data: PolygonRequest):
+    try:
+        # Mapbox/GeoJSON uses [lon, lat], OSMService expects [(lat, lon), ...]
+        polygon_coords = [(c[1], c[0]) for c in data.coordinates]
+        
+        osm_service = OSMService()
+        graph_service = GraphService()
+        
+        raw_osm = await osm_service.fetch_within_polygon(polygon_coords)
+        graph_data = graph_service.convert_osm_to_graph(raw_osm)
+        
+        return graph_data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
