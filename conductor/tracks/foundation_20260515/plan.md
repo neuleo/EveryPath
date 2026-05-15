@@ -1,10 +1,10 @@
 # Implementation Plan - Foundation: Docker Setup and Core Routing API
 
 ## Phase 1: Project Scaffolding & Dockerization
-- [ ] Task: Create root-level Docker and Docker Compose configuration
-    - [ ] Write `docker-compose.yml` defining `backend` and `frontend` services
-    - [ ] Create `backend/Dockerfile` (Python 3.11-slim)
-    - [ ] Create `frontend/Dockerfile` (Node.js/Nginx)
+- [x] Task: Create root-level Docker and Docker Compose configuration (00c7d80)
+    - [x] Write `docker-compose.yml` defining `backend` and `frontend` services
+    - [x] Create `backend/Dockerfile` (Python 3.11-slim)
+    - [x] Create `frontend/Dockerfile` (Node.js/Nginx)
 - [ ] Task: Initialize Python Backend
     - [ ] Setup `requirements.txt` with FastAPI, Uvicorn, SQLAlchemy, NetworkX, and GeoPandas
     - [ ] Create basic `main.py` with a health check endpoint
