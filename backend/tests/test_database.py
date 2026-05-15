@@ -14,3 +14,8 @@ def test_spatial_query():
         result = conn.execute(text("SELECT ST_AsText(ST_GeomFromText('POINT(1 1)', 4326))"))
         wkt = result.scalar()
         assert wkt == "POINT(1 1)"
+
+def test_spatial_metadata_exists():
+    with engine.connect() as conn:
+        result = conn.execute(text("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='spatial_ref_sys'"))
+        assert result.scalar() == 1
