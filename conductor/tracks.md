@@ -11,3 +11,10 @@ This file tracks all major tracks for the project. Each track has its own detail
 - [Progress Dashboard & Elevation (dashboard_elevation_20260515)](./tracks/dashboard_elevation_20260515/index.md) - [new]
 - [Final Features & Polish (final_features_20260515)](./tracks/final_features_20260515/index.md) - [new]
 
+## Phase 2: Live Tracking & Social
+- [Live Tracking & Session Recording (live_tracking_20260515)](./tracks/live_tracking_20260515/index.md) - [new]
+- [Gamification & Social Sharing (gamification_social_20260515)](./tracks/gamification_social_20260515/index.md) - [new]
+
+## Phase 3: Native Mobile Apps
+- [Native Mobile App Development (native_mobile_app_20260515)](./tracks/native_mobile_app_20260515/index.md) - [new]
+
