@@ -10,7 +10,7 @@ services:
     ports:
       - "8080:8000"
     environment:
-      - DATABASE_URL=sqlite:///app/data/everypath.sqlite
+      - DATABASE_URL=sqlite:////app/data/everypath.sqlite
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:

@@ -14,12 +14,12 @@
 - [x] Task: Conductor - User Manual Verification 'Project Scaffolding & Dockerization' (1c09950)
 
 ## Phase 2: Database & SpatiaLite Integration
-- [ ] Task: Setup SQLite/SpatiaLite in Backend
-    - [ ] Configure Dockerfile to install `libsqlite3-mod-spatialite`
-    - [ ] Create database connection utility in Python
-- [ ] Task: Write Tests for Geospatial Queries
-    - [ ] Write unit tests to verify spatial functions (e.g., `ST_AsText`) work in the container
-- [ ] Task: Implement Database Initialization
+- [x] Task: Setup SQLite/SpatiaLite in Backend (02dfa7d)
+    - [x] Configure Dockerfile to install `libsqlite3-mod-spatialite`
+    - [x] Create database connection utility in Python
+- [x] Task: Write Tests for Geospatial Queries (02dfa7d)
+    - [x] Write unit tests to verify spatial functions (e.g., `ST_AsText`) work in the container
+- [~] Task: Implement Database Initialization
     - [ ] Create a script to initialize the SQLite database with SpatiaLite extensions
 - [ ] Task: Conductor - User Manual Verification 'Database & SpatiaLite Integration' (Protocol in workflow.md)
 
