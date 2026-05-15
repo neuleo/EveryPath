@@ -13,15 +13,15 @@
     - [x] Verify frontend connects to backend health check
 - [x] Task: Conductor - User Manual Verification 'Project Scaffolding & Dockerization' (1c09950)
 
-## Phase 2: Database & SpatiaLite Integration
+## Phase 2: Database & SpatiaLite Integration [checkpoint: dd0f3d7]
 - [x] Task: Setup SQLite/SpatiaLite in Backend (51f2bd9)
     - [x] Configure Dockerfile to install `libsqlite3-mod-spatialite`
     - [x] Create database connection utility in Python
 - [x] Task: Write Tests for Geospatial Queries (51f2bd9)
     - [x] Write unit tests to verify spatial functions (e.g., `ST_AsText`) work in the container
-- [~] Task: Implement Database Initialization
-    - [ ] Create a script to initialize the SQLite database with SpatiaLite extensions
-- [ ] Task: Conductor - User Manual Verification 'Database & SpatiaLite Integration' (Protocol in workflow.md)
+- [x] Task: Implement Database Initialization (dd0f3d7)
+    - [x] Create a script to initialize the SQLite database with SpatiaLite extensions
+- [x] Task: Conductor - User Manual Verification 'Database & SpatiaLite Integration' (dd0f3d7)
 
 ## Phase 3: Core Routing Service (CPP Foundation)
 - [ ] Task: Write Tests for CPP Routing Service
