@@ -12,7 +12,7 @@ export default defineConfig({
   ],
   server: {
     host: true,
-    allowedHosts: ['everypath-test.neuleo.de'],
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: 'http://backend:8000',
