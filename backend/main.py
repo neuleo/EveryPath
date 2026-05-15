@@ -6,6 +6,11 @@ import networkx as nx
 from routing import RoutingService
 from osm_service import OSMService
 from graph_service import GraphService
+from database import get_db
+from models import Polygon
+from sqlalchemy.orm import Session
+from fastapi import Depends
+from shapely.geometry import Polygon as ShapelyPolygon
 
 app = FastAPI(title="EveryPath API")
 
@@ -62,10 +67,16 @@ async def generate_route(data: GraphData):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/fetch-osm")
-async def fetch_osm(data: PolygonRequest):
+async def fetch_osm(data: PolygonRequest, db: Session = Depends(get_db)):
     try:
         # Mapbox/GeoJSON uses [lon, lat], OSMService expects [(lat, lon), ...]
         polygon_coords = [(c[1], c[0]) for c in data.coordinates]
+        
+        # Save polygon to DB
+        shapely_poly = ShapelyPolygon(data.coordinates)
+        db_poly = Polygon(geom_wkt=shapely_poly.wkt)
+        db.add(db_poly)
+        db.commit()
         
         osm_service = OSMService()
         graph_service = GraphService()

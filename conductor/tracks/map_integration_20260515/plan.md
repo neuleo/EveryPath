@@ -11,6 +11,6 @@
 - [x] Task: Write tests for OSM processing and graph construction
 
 ## Phase 3: Integration & Visualization
-- [~] Task: Connect Frontend drawing to Backend OSM fetching
-- [ ] Task: Display fetched road network on the map
-- [ ] Task: Store user polygons in the database
+- [x] Task: Connect Frontend drawing to Backend OSM fetching
+- [x] Task: Display fetched road network on the map
+- [x] Task: Store user polygons in the database

@@ -1,5 +1,6 @@
 from database import engine, Base
 from sqlalchemy import text
+import models # Ensure models are registered
 import logging
 
 logging.basicConfig(level=logging.INFO)
