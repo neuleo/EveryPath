@@ -157,22 +157,37 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
           });
         });
 
+        let fetchAbortController: AbortController | null = null;
+        let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
         const updatePolygon = async () => {
           const data = draw.current?.getAll();
           if (data && data.features.length > 0) {
             const feature = data.features[0];
             if (feature.geometry.type === 'Polygon') {
               try {
+                if (fetchAbortController) {
+                  fetchAbortController.abort();
+                }
+                fetchAbortController = new AbortController();
+
                 const coords = (feature.geometry as any).coordinates[0];
                 const response = await fetch('/api/fetch-osm', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ coordinates: coords })
+                  body: JSON.stringify({ coordinates: coords }),
+                  signal: fetchAbortController.signal
                 });
                 
                 if (!response.ok) {
-                  const errData = await response.json();
-                  throw new Error(errData.detail || 'Server error fetching OSM data');
+                  let errDetail = `Server error: ${response.status} ${response.statusText}`;
+                  try {
+                    const errData = await response.json();
+                    if (errData && errData.detail) errDetail = errData.detail;
+                  } catch (e) {
+                    // Ignore JSON parsing errors for 502/504 HTML pages
+                  }
+                  throw new Error(errDetail);
                 }
                 
                 const graphData: GraphData = await response.json();
@@ -189,7 +204,7 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
                     geometry: { type: 'LineString', coordinates: [[u.lon, u.lat], [v.lon, v.lat]] },
                     properties: edge.metadata
                   };
-                }).filter((f: any) => f !== null);
+                }).filter((f: any) => f !== null) as any;
                 
                 const source = m.getSource('osm-edges') as maplibregl.GeoJSONSource;
                 source?.setData({ type: 'FeatureCollection', features });
@@ -199,6 +214,7 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
                 propsRef.current.onRouteGenerated([]);
 
               } catch (err: any) {
+                if (err.name === 'AbortError') return;
                 console.error('Map: Fetch Error:', err);
                 setMapError(err.message);
                 setTimeout(() => setMapError(null), 5000);
@@ -207,7 +223,17 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
           }
         };
 
+        const debouncedUpdatePolygon = () => {
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            updatePolygon();
+          }, 800);
+        };
+
         const clearMap = () => {
+          if (debounceTimer) clearTimeout(debounceTimer);
+          if (fetchAbortController) fetchAbortController.abort();
+          
           currentGraph.current = null;
           propsRef.current.onGraphFetched({ nodes: [], edges: [] });
           propsRef.current.onRouteGenerated([]);
@@ -219,8 +245,8 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
           routeSource?.setData({ type: 'FeatureCollection', features: [] });
         };
 
-        m.on('draw.create', updatePolygon);
-        m.on('draw.update', updatePolygon);
+        m.on('draw.create', debouncedUpdatePolygon);
+        m.on('draw.update', debouncedUpdatePolygon);
         m.on('draw.delete', clearMap);
 
       } catch (err: any) {
@@ -264,6 +290,18 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
             include_dead_ends: propsRef.current.includeDeadEnds
           })
         });
+
+        if (!response.ok) {
+          let errDetail = `Server error: ${response.status} ${response.statusText}`;
+          try {
+            const errData = await response.json();
+            if (errData && errData.detail) errDetail = errData.detail;
+          } catch (e) {
+            // Ignore JSON parsing errors for HTML pages
+          }
+          throw new Error(errDetail);
+        }
+
         const data: RouteResponse = await response.json();
         propsRef.current.onRouteGenerated(data.route);
         
