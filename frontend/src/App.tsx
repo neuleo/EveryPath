@@ -25,6 +25,12 @@ function App() {
     }
   }
 
+  const handleReset = () => {
+    if ((window as any).resetMap) {
+      (window as any).resetMap();
+    }
+  }
+
   const handleDownloadGPX = async () => {
     if (route.length === 0) return;
     
@@ -54,8 +60,21 @@ function App() {
       {/* Map Header Overlay */}
       <div style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 100, pointerEvents: 'none' }}>
         <div style={{ backgroundColor: 'rgba(0,0,0,0.85)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', color: 'white', pointerEvents: 'auto', backdropFilter: 'blur(10px)', width: '240px' }}>
-          <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#fff' }}>EveryPath</h1>
-          <p style={{ margin: '4px 0 20px 0', fontSize: '10px', opacity: 0.5, letterSpacing: '2px', textTransform: 'uppercase' }}>Routing & Coverage</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#fff' }}>EveryPath</h1>
+              <p style={{ margin: '4px 0 20px 0', fontSize: '10px', opacity: 0.5, letterSpacing: '2px', textTransform: 'uppercase' }}>Routing & Coverage</p>
+            </div>
+            {hasGraph && (
+              <button 
+                onClick={handleReset}
+                title="Auswahl löschen"
+                style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#ef4444', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                LÖSCHEN
+              </button>
+            )}
+          </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -119,12 +138,10 @@ function App() {
       <Map 
         includeDeadEnds={includeDeadEnds} 
         onGraphFetched={(data) => {
-          console.log('App: Graph data received with', data.edges.length, 'edges');
           setEdgeCount(data.edges.length);
           setHasGraph(data.edges.length > 0);
         }}
         onRouteGenerated={(r) => {
-          console.log('App: Route received with', r.length, 'nodes');
           setRoute(r);
         }}
       />

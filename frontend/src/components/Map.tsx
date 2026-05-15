@@ -104,107 +104,137 @@ export const Map = ({ includeDeadEnds, onGraphFetched, onRouteGenerated }: MapPr
   useEffect(() => {
     if (map.current || !mapContainer.current) return;
     
-    try {
-      const m = new maplibregl.Map({
-        container: mapContainer.current,
-        style: 'https://tiles.openfreemap.org/styles/dark', 
-        center: [11.582, 48.135],
-        zoom: 12
-      });
-      map.current = m;
-
-      m.on('load', () => {
-        draw.current = new MapboxDraw({
-          displayControlsDefault: false,
-          controls: { polygon: true, trash: true },
-          defaultMode: 'draw_polygon',
-          styles: drawStyles
+    // Default center (Munich) if geolocation fails
+    let initialCenter: [number, number] = [11.582, 48.135];
+    
+    const initMap = (center: [number, number]) => {
+      try {
+        const m = new maplibregl.Map({
+          container: mapContainer.current!,
+          style: 'https://tiles.openfreemap.org/styles/dark', 
+          center: center,
+          zoom: 14
         });
-        m.addControl(draw.current as any, 'top-right');
-        m.addControl(new maplibregl.NavigationControl(), 'bottom-right');
-        m.addControl(new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }), 'bottom-right');
+        map.current = m;
 
-        m.addSource('osm-edges', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-        m.addLayer({
-          id: 'osm-edges-layer',
-          type: 'line',
-          source: 'osm-edges',
-          layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: { 'line-color': '#00ffcc', 'line-width': 2, 'line-opacity': 0.6 }
+        m.on('load', () => {
+          draw.current = new MapboxDraw({
+            displayControlsDefault: false,
+            controls: { polygon: true, trash: true },
+            defaultMode: 'draw_polygon',
+            styles: drawStyles
+          });
+          m.addControl(draw.current as any, 'top-right');
+          m.addControl(new maplibregl.NavigationControl(), 'bottom-right');
+          m.addControl(new maplibregl.GeolocateControl({ 
+            positionOptions: { enableHighAccuracy: true }, 
+            trackUserLocation: true 
+          }), 'bottom-right');
+
+          m.addSource('osm-edges', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+          m.addLayer({
+            id: 'osm-edges-layer',
+            type: 'line',
+            source: 'osm-edges',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': '#00ffcc', 'line-width': 2, 'line-opacity': 0.6 }
+          });
+
+          m.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+          m.addLayer({
+            id: 'route-layer',
+            type: 'line',
+            source: 'route',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': '#3b82f6', 'line-width': 4, 'line-opacity': 0.8 }
+          });
         });
 
-        m.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-        m.addLayer({
-          id: 'route-layer',
-          type: 'line',
-          source: 'route',
-          layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: { 'line-color': '#3b82f6', 'line-width': 4, 'line-opacity': 0.8 }
-        });
-      });
+        const updatePolygon = async () => {
+          const data = draw.current?.getAll();
+          if (data && data.features.length > 0) {
+            const feature = data.features[0];
+            if (feature.geometry.type === 'Polygon') {
+              try {
+                const coords = (feature.geometry as any).coordinates[0];
+                const response = await fetch('/api/fetch-osm', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ coordinates: coords })
+                });
+                
+                if (!response.ok) {
+                  const errData = await response.json();
+                  throw new Error(errData.detail || 'Server error fetching OSM data');
+                }
+                
+                const graphData = await response.json();
+                currentGraph.current = graphData;
+                propsRef.current.onGraphFetched(graphData);
+                
+                const features = graphData.edges.map((edge: any) => {
+                  const u = graphData.nodes.find((n: any) => n.id === edge.u);
+                  const v = graphData.nodes.find((n: any) => n.id === edge.v);
+                  if (!u || !v) return null;
+                  return {
+                    type: 'Feature',
+                    geometry: { type: 'LineString', coordinates: [[u.lon, u.lat], [v.lon, v.lat]] },
+                    properties: edge.metadata
+                  };
+                }).filter((f: any) => f !== null);
+                
+                const source = m.getSource('osm-edges') as maplibregl.GeoJSONSource;
+                source?.setData({ type: 'FeatureCollection', features });
 
-      const updatePolygon = async () => {
-        const data = draw.current?.getAll();
-        if (data && data.features.length > 0) {
-          const feature = data.features[0];
-          if (feature.geometry.type === 'Polygon') {
-            try {
-              const coords = (feature.geometry as any).coordinates[0];
-              const response = await fetch('/api/fetch-osm', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ coordinates: coords })
-              });
-              
-              if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.detail || 'Server error fetching OSM data');
+                const routeSource = m.getSource('route') as maplibregl.GeoJSONSource;
+                routeSource?.setData({ type: 'FeatureCollection', features: [] });
+                propsRef.current.onRouteGenerated([]);
+
+              } catch (err: any) {
+                console.error('Map: Fetch Error:', err);
+                setMapError(err.message);
+                setTimeout(() => setMapError(null), 5000);
               }
-              
-              const graphData = await response.json();
-              if (!graphData || !graphData.edges) {
-                throw new Error('Invalid graph data received');
-              }
-
-              currentGraph.current = graphData;
-              propsRef.current.onGraphFetched(graphData);
-              
-              const features = graphData.edges.map((edge: any) => {
-                const u = graphData.nodes.find((n: any) => n.id === edge.u);
-                const v = graphData.nodes.find((n: any) => n.id === edge.v);
-                if (!u || !v) return null;
-                return {
-                  type: 'Feature',
-                  geometry: { type: 'LineString', coordinates: [[u.lon, u.lat], [v.lon, v.lat]] },
-                  properties: edge.metadata
-                };
-              }).filter((f: any) => f !== null);
-              
-              const source = m.getSource('osm-edges') as maplibregl.GeoJSONSource;
-              source?.setData({ type: 'FeatureCollection', features });
-
-              const routeSource = m.getSource('route') as maplibregl.GeoJSONSource;
-              routeSource?.setData({ type: 'FeatureCollection', features: [] });
-              propsRef.current.onRouteGenerated([]);
-
-            } catch (err: any) {
-              console.error('Map: Fetch Error:', err);
-              setMapError(err.message);
-              setTimeout(() => setMapError(null), 5000);
             }
           }
-        }
-      };
+        };
 
-      m.on('draw.create', updatePolygon);
-      m.on('draw.update', updatePolygon);
-      m.on('draw.delete', () => {
-        currentGraph.current = null;
-        propsRef.current.onGraphFetched({ nodes: [], edges: [] });
-      });
+        const clearMap = () => {
+          currentGraph.current = null;
+          propsRef.current.onGraphFetched({ nodes: [], edges: [] });
+          propsRef.current.onRouteGenerated([]);
+          
+          const osmSource = m.getSource('osm-edges') as maplibregl.GeoJSONSource;
+          osmSource?.setData({ type: 'FeatureCollection', features: [] });
+          
+          const routeSource = m.getSource('route') as maplibregl.GeoJSONSource;
+          routeSource?.setData({ type: 'FeatureCollection', features: [] });
+        };
 
-    } catch (err: any) {
-      setMapError(err.message);
+        m.on('draw.create', updatePolygon);
+        m.on('draw.update', updatePolygon);
+        m.on('draw.delete', clearMap);
+
+      } catch (err: any) {
+        setMapError(err.message);
+      }
+    };
+
+    // Attempt to get current position
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          console.log('Location found:', position.coords.latitude, position.coords.longitude);
+          initMap([position.coords.longitude, position.coords.latitude]);
+        },
+        (error) => {
+          console.warn('Geolocation failed:', error);
+          initMap(initialCenter);
+        },
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    } else {
+      initMap(initialCenter);
     }
 
     return () => {
@@ -234,6 +264,23 @@ export const Map = ({ includeDeadEnds, onGraphFetched, onRouteGenerated }: MapPr
       } catch (err: any) {
         console.error('Map: Route Error:', err);
         setMapError(err.message);
+      }
+    };
+
+    (window as any).resetMap = () => {
+      if (draw.current) {
+        draw.current.deleteAll();
+        // Trigger manual update because deleteAll() doesn't fire events
+        currentGraph.current = null;
+        propsRef.current.onGraphFetched({ nodes: [], edges: [] });
+        propsRef.current.onRouteGenerated([]);
+        
+        if (map.current) {
+          const osmSource = map.current.getSource('osm-edges') as maplibregl.GeoJSONSource;
+          osmSource?.setData({ type: 'FeatureCollection', features: [] });
+          const routeSource = map.current.getSource('route') as maplibregl.GeoJSONSource;
+          routeSource?.setData({ type: 'FeatureCollection', features: [] });
+        }
       }
     };
   }, []); 
