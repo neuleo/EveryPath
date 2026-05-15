@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Map } from './components/Map'
-import './App.css'
+import './index.css'
 
 function App() {
   const [backendStatus, setBackendStatus] = useState<string>('Checking...')
@@ -16,24 +16,20 @@ function App() {
   }, [])
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-gray-900">
-      {/* Map is the hero component */}
-      <Map />
-
-      {/* Overlay UI */}
-      <div className="absolute top-4 left-4 z-10">
-        <div className="bg-black/70 backdrop-blur-md p-4 rounded-lg shadow-xl border border-white/10 text-white max-w-xs">
-          <h1 className="text-2xl font-bold tracking-tighter mb-1">EveryPath</h1>
-          <p className="text-xs text-gray-400 mb-4 uppercase tracking-widest">Routing & Coverage</p>
-          
-          <div className="flex items-center space-x-2 bg-white/5 p-2 rounded">
-            <div className={`w-2 h-2 rounded-full ${backendStatus === 'OK' ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-red-500'}`} />
-            <p className="text-xs font-medium text-gray-300">
-              API: {backendStatus}
-            </p>
+    <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', backgroundColor: '#0f172a' }}>
+      {/* Map Header Overlay */}
+      <div style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 100, pointerEvents: 'none' }}>
+        <div style={{ backgroundColor: 'rgba(0,0,0,0.8)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}>
+          <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>EveryPath</h1>
+          <p style={{ margin: '4px 0 16px 0', fontSize: '10px', opacity: 0.5, letterSpacing: '2px', textTransform: 'uppercase' }}>Routing & Coverage</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+             <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: backendStatus === 'OK' ? '#22c55e' : '#ef4444' }} />
+             <span style={{ fontSize: '12px' }}>API: {backendStatus}</span>
           </div>
         </div>
       </div>
+
+      <Map />
     </div>
   )
 }

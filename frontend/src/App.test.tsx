@@ -1,9 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { expect, test, vi } from 'vitest'
+import '@testing-library/jest-dom'
 import App from './App'
-
-// Mock global fetch
-global.fetch = vi.fn()
 
 // Mock maplibre-gl
 vi.mock('maplibre-gl', () => {
@@ -34,9 +32,11 @@ vi.mock('@mapbox/mapbox-gl-draw', () => {
 })
 
 test('renders EveryPath heading', () => {
-  (fetch as any).mockResolvedValue({
-    json: () => Promise.resolve({ status: 'OK' }),
-  })
+  vi.stubGlobal('fetch', vi.fn(() => 
+    Promise.resolve({
+      json: () => Promise.resolve({ status: 'OK' }),
+    })
+  ) as any)
 
   render(<App />)
   const heading = screen.getByText(/EveryPath/i)
@@ -44,20 +44,23 @@ test('renders EveryPath heading', () => {
 })
 
 test('displays backend status OK when fetch is successful', async () => {
-  (fetch as any).mockResolvedValue({
-    json: () => Promise.resolve({ status: 'OK' }),
-  })
+  const fetchMock = vi.fn(() => 
+    Promise.resolve({
+      json: () => Promise.resolve({ status: 'OK' }),
+    })
+  )
+  vi.stubGlobal('fetch', fetchMock as any)
 
   render(<App />)
   
   await waitFor(() => {
     expect(screen.getByText(/API: OK/i)).toBeInTheDocument()
   })
-  expect(fetch).toHaveBeenCalledWith('/api/health')
+  expect(fetchMock).toHaveBeenCalledWith('/api/health')
 })
 
 test('displays error message when fetch fails', async () => {
-  (fetch as any).mockRejectedValue(new Error('Fetch failed'))
+  vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('Fetch failed'))) as any)
 
   render(<App />)
   
