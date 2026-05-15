@@ -38,4 +38,4 @@
 - [x] Task: Implement GPX Export Utility (7244744)
     - [x] Write unit tests for GPX XML generation
     - [x] Implement utility to convert a list of coordinates into a `.gpx` file
-- [ ] Task: Conductor - User Manual Verification 'API & Export Foundation' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'API & Export Foundation' (e8daa1d)
