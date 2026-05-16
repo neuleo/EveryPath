@@ -296,7 +296,9 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
                 currentGraph.current = graphData;
                 propsRef.current.onGraphFetched(graphData);
                 
-                const features = graphData.edges.map((edge: any) => {
+                const features = graphData.edges
+                  .filter((edge: any) => edge.required !== false)
+                  .map((edge: any) => {
                   const u = graphData.nodes.find((n: any) => n.id === edge.u);
                   const v = graphData.nodes.find((n: any) => n.id === edge.v);
                   if (!u || !v) return null;
