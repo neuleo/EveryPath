@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import networkx as nx
 from sqlalchemy.orm import Session
-from shapely.geometry import Polygon as ShapelyPolygon, Point
+from shapely.geometry import Polygon as ShapelyPolygon, Point, MultiPoint
 import traceback
 import logging
 
@@ -93,7 +93,6 @@ async def generate_route(data: GraphData):
         if data.end_coords:
             end_node_id = service.find_nearest_node(G, data.end_coords[0], data.end_coords[1])
         elif data.start_coords:
-            # Fallback: if no end point, use start point to create a loop
             end_node_id = start_node_id
 
         # Core logic in routing.py solve_cpp now handles Eulerian path vs circuit
@@ -113,8 +112,6 @@ async def fetch_osm(data: PolygonRequest, db: Session = Depends(get_db)):
         if len(data.coordinates) < 3:
             raise HTTPException(status_code=400, detail="Polygon must have at least 3 points")
 
-        # Mapbox/GeoJSON uses [lon, lat], OSMService expects [(lat, lon), ...]
-        
         # Save polygon to DB
         try:
             shell = list(data.coordinates)
@@ -137,17 +134,28 @@ async def fetch_osm(data: PolygonRequest, db: Session = Depends(get_db)):
         osm_service = OSMService()
         graph_service = GraphService()
         
-        # Combine geometries to ensure start/end points are included in fetch
-        combined_geom = shapely_poly
-        if data.start_coords:
-            combined_geom = combined_geom.union(Point(data.start_coords[0], data.start_coords[1]))
-        if data.end_coords:
-            combined_geom = combined_geom.union(Point(data.end_coords[0], data.end_coords[1]))
+        # Target area 1: The user's polygon (required paths)
+        # Target area 2: Buffered path between start and polygon (traversal paths)
         
-        buffered_poly = combined_geom.envelope.buffer(0.001) # ~100m padding around the bounding box
-        fetch_coords = [(p[1], p[0]) for p in buffered_poly.exterior.coords]
+        fetch_points = []
+        for c in data.coordinates:
+            fetch_points.append(Point(c[0], c[1]))
+        if data.start_coords:
+            fetch_points.append(Point(data.start_coords[0], data.start_coords[1]))
+        if data.end_coords:
+            fetch_points.append(Point(data.end_coords[0], data.end_coords[1]))
+            
+        # Instead of envelope (huge box), we fetch multiple overlapping buffers
+        # 1. 200m around the polygon
+        # 2. 500m around start/end points
+        poly_buffer = shapely_poly.buffer(0.002) 
+        
+        # To keep it simple but effective: use Convex Hull instead of Envelope
+        # Convex Hull is much tighter than a bounding box
+        hull = MultiPoint(fetch_points).convex_hull.buffer(0.001)
+        fetch_coords = [(p[1], p[0]) for p in hull.exterior.coords]
 
-        logger.info("Fetching from Overpass...")
+        logger.info("Fetching from Overpass for hull area...")
         try:
             raw_osm = await osm_service.fetch_within_polygon(fetch_coords)
         except Exception as osm_err:
@@ -160,7 +168,8 @@ async def fetch_osm(data: PolygonRequest, db: Session = Depends(get_db)):
         if not elements:
             return {"nodes": [], "edges": []}
 
-        graph_data = graph_service.convert_osm_to_graph(raw_osm, polygon=shapely_poly, buffered_polygon=buffered_poly)
+        # Convert to graph, strictly marking ONLY roads in original shapely_poly as required
+        graph_data = graph_service.convert_osm_to_graph(raw_osm, polygon=shapely_poly, buffered_polygon=hull)
         logger.info(f"Converted to graph with {len(graph_data['edges'])} edges")
         
         return graph_data

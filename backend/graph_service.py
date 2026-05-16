@@ -19,20 +19,24 @@ class GraphService:
     def convert_osm_to_graph(self, osm_data: Dict[str, Any], polygon: Optional[Polygon] = None, buffered_polygon: Optional[Polygon] = None) -> Dict[str, Any]:
         """
         Converts OSM JSON data into a graph format (nodes and edges).
-        Nodes are strictly filtered to the buffered_polygon to prevent the graph from growing infinitely.
-        Edges are tagged as 'required' if they significantly intersect the original polygon.
+        Edges are tagged as 'required' if they are significantly inside the 'polygon'.
+        Nodes are strictly filtered to the 'buffered_polygon' to keep the graph size manageable.
         """
         nodes = {}
         for element in osm_data.get("elements", []):
             if element["type"] == "node":
                 pt = Point(element["lon"], element["lat"])
-                # Strictly limit graph nodes to the buffered area to prevent overflow
-                if buffered_polygon is None or buffered_polygon.intersects(pt):
-                    nodes[element["id"]] = {
-                        "id": element["id"],
-                        "lat": element["lat"],
-                        "lon": element["lon"]
-                    }
+                
+                # If a buffer is provided, only keep nodes within that buffer
+                # This prevents fetching/keeping roads kilometers away from our target areas
+                if buffered_polygon is not None and not buffered_polygon.contains(pt):
+                    continue
+
+                nodes[element["id"]] = {
+                    "id": element["id"],
+                    "lat": element["lat"],
+                    "lon": element["lon"]
+                }
         
         edges = []
         graph_nodes = set()
@@ -53,20 +57,16 @@ class GraphService:
                         is_required = True
                         if polygon is not None:
                             line = LineString([(u["lon"], u["lat"]), (v["lon"], v["lat"])])
+                            
+                            # An edge is ONLY green (required) if it intersects the actual user polygon
                             if not polygon.intersects(line):
                                 is_required = False
                             else:
-                                # Check how much of the line is inside
+                                # Anti-poke: If it only touches the border for < 10m, it's not required
                                 intersection = polygon.intersection(line)
-                                # Approximate length in meters (1 deg ~ 111000m)
-                                length_inside_m = intersection.length * 111000
-                                line_length_m = line.length * 111000
-                                
-                                # Required if >50% inside, OR if more than 15 meters inside
-                                # This avoids 'pokes' at junctions while ensuring small segments inside are kept
-                                if length_inside_m > 15 or (length_inside_m > 0.5 * line_length_m):
-                                    is_required = True
-                                else:
+                                # Length in degrees to meters (approx)
+                                length_m = intersection.length * 111000
+                                if length_m < 10:
                                     is_required = False
                         
                         weight = self.haversine_distance(u["lat"], u["lon"], v["lat"], v["lon"])
