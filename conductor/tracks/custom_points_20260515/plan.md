@@ -7,15 +7,15 @@
 - [x] Task: Write tests for start/end point connectivity in the graph
 - [x] Task: Conductor - User Manual Verification 'Backend API Enhancements' (Protocol in workflow.md)
 
-## Phase 2: Frontend Map Interaction
-- [~] Task: Implement long-press event handling in `Map.tsx` to set markers
-- [ ] Task: Create UI buttons in the overlay for manual point setting
-- [ ] Task: Visualize start and end markers on the map
-- [ ] Task: Write component tests for point selection logic
-- [ ] Task: Conductor - User Manual Verification 'Frontend Map Interaction' (Protocol in workflow.md)
+## Phase 2: Frontend Map Interaction [checkpoint: 7676e64]
+- [x] Task: Implement long-press event handling in `Map.tsx` to set markers
+- [x] Task: Create UI buttons in the overlay for manual point setting
+- [x] Task: Visualize start and end markers on the map
+- [x] Task: Write component tests for point selection logic
+- [x] Task: Conductor - User Manual Verification 'Frontend Map Interaction' (Protocol in workflow.md)
 
 ## Phase 3: Integration & Fallbacks
-- [ ] Task: Implement auto-detection logic using user's current location if no start point is set
+- [~] Task: Implement auto-detection logic using user's current location if no start point is set
 - [ ] Task: Pass coordinates to the `/generate-route` call
 - [ ] Task: Final verification of the end-to-end routing flow with custom points
 - [ ] Task: Conductor - User Manual Verification 'Integration & Fallbacks' (Protocol in workflow.md)
