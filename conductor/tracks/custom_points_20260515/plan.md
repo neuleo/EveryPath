@@ -1,14 +1,14 @@
 # Implementation Plan - Custom Start and End Points
 
-## Phase 1: Backend API Enhancements
-- [~] Task: Update `GraphData` and `RoutingService` to accept optional start/end coordinates
-- [ ] Task: Implement 'Nearest Node' lookup logic in the backend
-- [ ] Task: Update routing logic to connect start/end points to the main Eulerian circuit
-- [ ] Task: Write tests for start/end point connectivity in the graph
-- [ ] Task: Conductor - User Manual Verification 'Backend API Enhancements' (Protocol in workflow.md)
+## Phase 1: Backend API Enhancements [checkpoint: c38cc90]
+- [x] Task: Update `GraphData` and `RoutingService` to accept optional start/end coordinates
+- [x] Task: Implement 'Nearest Node' lookup logic in the backend
+- [x] Task: Update routing logic to connect start/end points to the main Eulerian circuit
+- [x] Task: Write tests for start/end point connectivity in the graph
+- [x] Task: Conductor - User Manual Verification 'Backend API Enhancements' (Protocol in workflow.md)
 
 ## Phase 2: Frontend Map Interaction
-- [ ] Task: Implement long-press event handling in `Map.tsx` to set markers
+- [~] Task: Implement long-press event handling in `Map.tsx` to set markers
 - [ ] Task: Create UI buttons in the overlay for manual point setting
 - [ ] Task: Visualize start and end markers on the map
 - [ ] Task: Write component tests for point selection logic
