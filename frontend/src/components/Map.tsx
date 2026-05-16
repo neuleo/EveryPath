@@ -150,40 +150,50 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
         propsRef.current.onRouteGenerated(data.route);
         
         const routeCoords = data.route.map((node: any) => [node.lon, node.lat]);
+
+        // Fit bounds to show the whole route
+        if (routeCoords.length > 0) {
+          const bounds = new maplibregl.LngLatBounds();
+          routeCoords.forEach((c: [number, number]) => bounds.extend(c));
+          map.current.fitBounds(bounds, { padding: 50, duration: 1000 });
+        }
+
         const routeSource = map.current?.getSource('route') as maplibregl.GeoJSONSource;
         
         if (animationRef.current) cancelAnimationFrame(animationRef.current);
         
         let progress = 0;
         const totalNodes = routeCoords.length;
-        const drawStep = Math.max(1, Math.floor(totalNodes / 120)); 
+        // Adjust animation speed: roughly 2-3 seconds for the whole route
+        const drawStep = Math.max(1, Math.ceil(totalNodes / 150)); 
         
-        const animateLine = () => {
-          progress += drawStep;
-          if (progress > totalNodes) progress = totalNodes;
-          
-          routeSource?.setData({
-            type: 'Feature',
-            geometry: {
-              type: 'LineString',
-              coordinates: routeCoords.slice(0, progress)
-            },
-            properties: {}
-          } as any);
-          
-          if (progress < totalNodes) {
-             animationRef.current = requestAnimationFrame(animateLine);
-          } else {
-            propsRef.current.onLoadingChange?.(false);
-          }
-        };
-        
-        if (totalNodes > 0) {
-          animateLine();
-        } else {
-          routeSource?.setData({ type: 'FeatureCollection', features: [] });
+        // Brief delay to allow fitBounds to start
+        setTimeout(() => {
           propsRef.current.onLoadingChange?.(false);
-        }
+          const animateLine = () => {
+            progress += drawStep;
+            if (progress > totalNodes) progress = totalNodes;
+            
+            routeSource?.setData({
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: routeCoords.slice(0, progress)
+              },
+              properties: {}
+            } as any);
+            
+            if (progress < totalNodes) {
+               animationRef.current = requestAnimationFrame(animateLine);
+            }
+          };
+          
+          if (totalNodes > 0) {
+            animateLine();
+          } else {
+            routeSource?.setData({ type: 'FeatureCollection', features: [] });
+          }
+        }, 1000);
 
       } catch (err: any) {
         console.error('Map: Route Error:', err);
