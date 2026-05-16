@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import networkx as nx
 from sqlalchemy.orm import Session
-from shapely.geometry import Polygon as ShapelyPolygon
+from shapely.geometry import Polygon as ShapelyPolygon, Point
 import traceback
 import logging
 
@@ -53,6 +53,8 @@ class RouteResponse(BaseModel):
 
 class PolygonRequest(BaseModel):
     coordinates: List[List[float]] # [[lon, lat], ...]
+    start_coords: Optional[List[float]] = None # [lon, lat]
+    end_coords: Optional[List[float]] = None # [lon, lat]
 
 class GPXRequest(BaseModel):
     coordinates: List[List[float]] # [[lat, lon], ...]
@@ -73,7 +75,7 @@ async def generate_route(data: GraphData):
         for n in data.nodes:
             G.add_node(n["id"], lat=n["lat"], lon=n["lon"])
         for edge in data.edges:
-            G.add_edge(edge.u, edge.v, weight=edge.weight)
+            G.add_edge(edge.u, edge.v, weight=edge.weight, required=edge.required)
         
         service = RoutingService()
         
@@ -91,12 +93,14 @@ async def generate_route(data: GraphData):
         if data.end_coords:
             end_node_id = service.find_nearest_node(G, data.end_coords[0], data.end_coords[1])
 
+        # Core logic in routing.py solve_cpp now handles Eulerian path vs circuit
         route_ids, is_disconnected = service.solve_cpp(G, start_node_id, end_node_id)
         route_nodes = [node_map[node_id] for node_id in route_ids if node_id in node_map]
         
         return {"route": route_nodes, "is_disconnected": is_disconnected}
     except Exception as e:
         logger.error(f"Error in generate_route: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/fetch-osm")
@@ -107,7 +111,6 @@ async def fetch_osm(data: PolygonRequest, db: Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail="Polygon must have at least 3 points")
 
         # Mapbox/GeoJSON uses [lon, lat], OSMService expects [(lat, lon), ...]
-        polygon_coords = [(c[1], c[0]) for c in data.coordinates]
         
         # Save polygon to DB
         try:
@@ -131,9 +134,19 @@ async def fetch_osm(data: PolygonRequest, db: Session = Depends(get_db)):
         osm_service = OSMService()
         graph_service = GraphService()
         
+        # Combine geometries to ensure start/end points are included in fetch
+        combined_geom = shapely_poly
+        if data.start_coords:
+            combined_geom = combined_geom.union(Point(data.start_coords[0], data.start_coords[1]))
+        if data.end_coords:
+            combined_geom = combined_geom.union(Point(data.end_coords[0], data.end_coords[1]))
+        
+        buffered_poly = combined_geom.envelope.buffer(0.001) # ~100m padding around the bounding box
+        fetch_coords = [(p[1], p[0]) for p in buffered_poly.exterior.coords]
+
         logger.info("Fetching from Overpass...")
         try:
-            raw_osm = await osm_service.fetch_within_polygon(polygon_coords)
+            raw_osm = await osm_service.fetch_within_polygon(fetch_coords)
         except Exception as osm_err:
             logger.error(f"Overpass API error: {osm_err}")
             raise HTTPException(status_code=502, detail=f"OSM Service error: {str(osm_err)}")
@@ -144,7 +157,7 @@ async def fetch_osm(data: PolygonRequest, db: Session = Depends(get_db)):
         if not elements:
             return {"nodes": [], "edges": []}
 
-        graph_data = graph_service.convert_osm_to_graph(raw_osm, polygon=shapely_poly)
+        graph_data = graph_service.convert_osm_to_graph(raw_osm, polygon=shapely_poly, buffered_polygon=buffered_poly)
         logger.info(f"Converted to graph with {len(graph_data['edges'])} edges")
         
         return graph_data

@@ -110,6 +110,7 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
   const endMarker = useRef<maplibregl.Marker | null>(null);
   const startCoords = useRef<[number, number] | null>(null);
   const endCoords = useRef<[number, number] | null>(null);
+  const userLocation = useRef<[number, number] | null>(null);
 
   const propsRef = useRef({ onGraphFetched, onRouteGenerated, includeDeadEnds, onStartPointSet, onEndPointSet });
   useEffect(() => {
@@ -121,6 +122,7 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
       if (!currentGraph.current || !map.current) return;
       
       try {
+        const start = startCoords.current || userLocation.current;
         const response = await fetch('/api/generate-route', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -128,7 +130,7 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
             nodes: currentGraph.current.nodes,
             edges: currentGraph.current.edges,
             include_dead_ends: propsRef.current.includeDeadEnds,
-            start_coords: startCoords.current,
+            start_coords: start,
             end_coords: endCoords.current
           })
         });
@@ -279,10 +281,15 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
             if (feature.geometry.type === 'Polygon') {
               try {
                 const coords = (feature.geometry as any).coordinates[0];
+                // Pass start/end coords to fetch-osm so it can expand the area
                 const response = await fetch('/api/fetch-osm', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ coordinates: coords })
+                  body: JSON.stringify({ 
+                    coordinates: coords,
+                    start_coords: startCoords.current || userLocation.current,
+                    end_coords: endCoords.current
+                  })
                 });
                 
                 const graphData = await response.json();
@@ -338,7 +345,9 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          initMap([position.coords.longitude, position.coords.latitude]);
+          const coords: [number, number] = [position.coords.longitude, position.coords.latitude];
+          userLocation.current = coords;
+          initMap(coords);
         },
         () => {
           initMap(initialCenter);
@@ -355,6 +364,7 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
     };
   }, []);
 
+  // Update markers when coords change
   useEffect(() => {
     if (!map.current) return;
     const m = map.current;
@@ -395,7 +405,7 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div ref={mapContainer} style={{ position: 'absolute', inset: 0 }} />
       {pointMode && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-blue-600 text-white px-6 py-2 rounded-full font-bold shadow-lg animate-pulse">
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-blue-600 text-white px-6 py-2 rounded-full font-bold shadow-lg animate-pulse text-xs text-center">
           Klicke auf die Karte, um den {pointMode === 'start' ? 'STARTPUNKT' : 'ENDPUNKT'} zu setzen
         </div>
       )}
