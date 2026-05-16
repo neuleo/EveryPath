@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import networkx as nx
 from sqlalchemy.orm import Session
 from shapely.geometry import Polygon as ShapelyPolygon
@@ -38,11 +38,14 @@ class Edge(BaseModel):
     u: int
     v: int
     weight: float = 1.0
+    required: bool = True
 
 class GraphData(BaseModel):
     nodes: List[Dict[str, Any]]
     edges: List[Edge]
     include_dead_ends: bool = True
+    start_coords: Optional[List[float]] = None # [lon, lat]
+    end_coords: Optional[List[float]] = None # [lon, lat]
 
 class RouteResponse(BaseModel):
     route: List[Dict[str, Any]]
@@ -80,7 +83,15 @@ async def generate_route(data: GraphData):
         if G.number_of_nodes() == 0:
              return {"route": [], "is_disconnected": False}
              
-        route_ids, is_disconnected = service.solve_cpp(G)
+        start_node_id = -1
+        if data.start_coords:
+            start_node_id = service.find_nearest_node(G, data.start_coords[0], data.start_coords[1])
+            
+        end_node_id = -1
+        if data.end_coords:
+            end_node_id = service.find_nearest_node(G, data.end_coords[0], data.end_coords[1])
+
+        route_ids, is_disconnected = service.solve_cpp(G, start_node_id, end_node_id)
         route_nodes = [node_map[node_id] for node_id in route_ids if node_id in node_map]
         
         return {"route": route_nodes, "is_disconnected": is_disconnected}

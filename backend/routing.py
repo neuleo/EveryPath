@@ -125,9 +125,23 @@ class RoutingService:
             edges_result.append((circuit[i], circuit[i+1]))
         return edges_result
 
-    def solve_cpp(self, G: nx.Graph):
+    def find_nearest_node(self, G: nx.Graph, lon: float, lat: float) -> int:
+        """Finds the node in the graph closest to the given coordinates."""
+        min_dist = float('inf')
+        nearest_node = -1
+        
+        for n, data in G.nodes(data=True):
+            if 'lat' in data and 'lon' in data:
+                dist = self.haversine_distance(lat, lon, data['lat'], data['lon'])
+                if dist < min_dist:
+                    min_dist = dist
+                    nearest_node = n
+        return nearest_node
+
+    def solve_cpp(self, G: nx.Graph, start_node_id: int = -1, end_node_id: int = -1):
         """
-        Solves the Chinese Postman Problem (CPP) for an undirected graph.
+        Solves the Chinese Postman Problem (CPP) or finds an Eulerian path
+        if start and end nodes are different.
         Returns a tuple of (list of nodes, is_disconnected flag).
         """
         is_disconnected = False
@@ -135,37 +149,49 @@ class RoutingService:
             is_disconnected = True
             G = self.connect_components(G)
 
-        odd_nodes = self.get_odd_degree_nodes(G)
+        # Handle start/end nodes. If not provided, pick arbitrary.
+        s = start_node_id if start_node_id != -1 and start_node_id in G else list(G.nodes())[0]
+        t = end_node_id if end_node_id != -1 and end_node_id in G else s
 
-        if not odd_nodes:
-            # Graph is already Eulerian
-            edges = self._optimized_eulerian_circuit(nx.MultiGraph(G), list(G.nodes())[0])
-            return self._edges_to_nodes(edges), is_disconnected
+        odd_nodes = set(self.get_odd_degree_nodes(G))
         
-        # 1. Calculate all pairs shortest paths between odd nodes
-        odd_node_pairs = list(itertools.combinations(odd_nodes, 2))
-        
-        # 2. Find min weight perfect matching
-        complete_graph = nx.Graph()
-        for u, v in odd_node_pairs:
-            try:
-                weight = nx.shortest_path_length(G, u, v, weight='weight')
-                complete_graph.add_edge(u, v, weight=-weight) # NX uses max weight matching
-            except nx.NetworkXNoPath:
-                continue
+        # Symmetric difference to find nodes whose parity needs to change
+        # to ensure ONLY s and t have odd degrees (if s != t)
+        # or ALL nodes have even degrees (if s == t).
+        if s == t:
+            target_nodes = list(odd_nodes)
+        else:
+            target_nodes = list(odd_nodes.symmetric_difference({s, t}))
+
+        if not target_nodes:
+            # Graph already has correct parities
+            augmented_G = nx.MultiGraph(G)
+        else:
+            # Find min weight perfect matching on target_nodes
+            complete_graph = nx.Graph()
+            for u, v in itertools.combinations(target_nodes, 2):
+                try:
+                    weight = nx.shortest_path_length(G, u, v, weight='weight')
+                    complete_graph.add_edge(u, v, weight=-weight)
+                except nx.NetworkXNoPath:
+                    continue
             
-        matching = nx.max_weight_matching(complete_graph, maxcardinality=True, weight='weight')
+            matching = nx.max_weight_matching(complete_graph, maxcardinality=True, weight='weight')
+            
+            augmented_G = nx.MultiGraph(G)
+            for u, v in matching:
+                path = nx.shortest_path(G, u, v, weight='weight')
+                for i in range(len(path) - 1):
+                    attr = G[path[i]][path[i+1]]
+                    augmented_G.add_edge(path[i], path[i+1], **attr)
         
-        # 3. Augment the original graph
-        augmented_G = nx.MultiGraph(G)
-        for u, v in matching:
-            path = nx.shortest_path(G, u, v, weight='weight')
-            for i in range(len(path) - 1):
-                # Copy attributes from original edge
-                attr = G[path[i]][path[i+1]]
-                augmented_G.add_edge(path[i], path[i+1], **attr)
-        
-        # 4. Find Eulerian circuit
-        edges = self._optimized_eulerian_circuit(augmented_G, list(G.nodes())[0])
+        # Find Eulerian circuit (if s==t) or Eulerian path (if s!=t)
+        if s == t:
+            edges = self._optimized_eulerian_circuit(augmented_G, s)
+        else:
+            # For s != t, Hierholzer's naturally works if we start at s.
+            # The algorithm will end at t because it's the only other odd-degree node.
+            edges = self._optimized_eulerian_circuit(augmented_G, s)
+            
         return self._edges_to_nodes(edges), is_disconnected
 

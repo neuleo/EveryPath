@@ -21,5 +21,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: Custom Start and End Points**
+- [~] **Track: Custom Start and End Points**
 *Link: [./tracks/custom_points_20260515/](./tracks/custom_points_20260515/)*

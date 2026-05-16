@@ -1,7 +1,7 @@
 # Implementation Plan - Custom Start and End Points
 
 ## Phase 1: Backend API Enhancements
-- [ ] Task: Update `GraphData` and `RoutingService` to accept optional start/end coordinates
+- [~] Task: Update `GraphData` and `RoutingService` to accept optional start/end coordinates
 - [ ] Task: Implement 'Nearest Node' lookup logic in the backend
 - [ ] Task: Update routing logic to connect start/end points to the main Eulerian circuit
 - [ ] Task: Write tests for start/end point connectivity in the graph
