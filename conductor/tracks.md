@@ -18,3 +18,8 @@ This file tracks all major tracks for the project. Each track has its own detail
 ## Phase 3: Native Mobile Apps
 - [Native Mobile App Development (native_mobile_app_20260515)](./tracks/native_mobile_app_20260515/index.md) - [new]
 
+
+---
+
+- [ ] **Track: Custom Start and End Points**
+*Link: [./tracks/custom_points_20260515/](./tracks/custom_points_20260515/)*
