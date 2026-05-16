@@ -14,8 +14,13 @@
 - [x] Task: Write component tests for point selection logic
 - [x] Task: Conductor - User Manual Verification 'Frontend Map Interaction' (Protocol in workflow.md)
 
-## Phase 3: Integration & Fallbacks
-- [~] Task: Implement auto-detection logic using user's current location if no start point is set
-- [ ] Task: Pass coordinates to the `/generate-route` call
-- [ ] Task: Final verification of the end-to-end routing flow with custom points
-- [ ] Task: Conductor - User Manual Verification 'Integration & Fallbacks' (Protocol in workflow.md)
+## Phase 3: Integration & Fallbacks [checkpoint: 7676e64]
+- [x] Task: Implement auto-detection logic using user's current location if no start point is set
+- [x] Task: Pass coordinates to the `/generate-route` call
+- [x] Task: Final verification of the end-to-end routing flow with custom points
+- [x] Task: Conductor - User Manual Verification 'Integration & Fallbacks' (Protocol in workflow.md)
+
+## Phase 4: Progress Visualization
+- [ ] Task: Implement a staged progress indicator (Steps 1-4) in the loading overlay
+- [ ] Task: Add a visual progress bar that animates during route generation
+- [ ] Task: Final UX verification of the loading states
