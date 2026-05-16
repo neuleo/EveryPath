@@ -1,6 +1,6 @@
 import math
 from typing import List, Dict, Any, Tuple, Optional
-from shapely.geometry import Polygon, Point
+from shapely.geometry import Polygon, Point, LineString
 
 class GraphService:
     def haversine_distance(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -16,19 +16,23 @@ class GraphService:
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
         return R * c
 
-    def convert_osm_to_graph(self, osm_data: Dict[str, Any], polygon: Optional[Polygon] = None) -> Dict[str, Any]:
+    def convert_osm_to_graph(self, osm_data: Dict[str, Any], polygon: Optional[Polygon] = None, buffered_polygon: Optional[Polygon] = None) -> Dict[str, Any]:
         """
         Converts OSM JSON data into a graph format (nodes and edges).
-        If polygon is provided, strictly filters edges to those where at least one node is inside.
+        Nodes are strictly filtered to the buffered_polygon to prevent the graph from growing infinitely.
+        Edges are tagged as 'required' if they significantly intersect the original polygon.
         """
         nodes = {}
         for element in osm_data.get("elements", []):
             if element["type"] == "node":
-                nodes[element["id"]] = {
-                    "id": element["id"],
-                    "lat": element["lat"],
-                    "lon": element["lon"]
-                }
+                pt = Point(element["lon"], element["lat"])
+                # Strictly limit graph nodes to the buffered area to prevent overflow
+                if buffered_polygon is None or buffered_polygon.intersects(pt):
+                    nodes[element["id"]] = {
+                        "id": element["id"],
+                        "lat": element["lat"],
+                        "lon": element["lon"]
+                    }
         
         edges = []
         graph_nodes = set()
@@ -46,14 +50,24 @@ class GraphService:
                         u = nodes[u_id]
                         v = nodes[v_id]
                         
+                        is_required = True
                         if polygon is not None:
-                            # Mapbox uses lon, lat
-                            p_u = Point(u["lon"], u["lat"])
-                            p_v = Point(v["lon"], v["lat"])
-                            # Add an edge if at least one of its nodes is within or touches the polygon.
-                            # Using buffer to allow small tolerance.
-                            if not (polygon.intersects(p_u) or polygon.intersects(p_v)):
-                                continue
+                            line = LineString([(u["lon"], u["lat"]), (v["lon"], v["lat"])])
+                            if not polygon.intersects(line):
+                                is_required = False
+                            else:
+                                # Check how much of the line is inside
+                                intersection = polygon.intersection(line)
+                                # Approximate length in meters (1 deg ~ 111000m)
+                                length_inside_m = intersection.length * 111000
+                                line_length_m = line.length * 111000
+                                
+                                # Required if >50% inside, OR if more than 15 meters inside
+                                # This avoids 'pokes' at junctions while ensuring small segments inside are kept
+                                if length_inside_m > 15 or (length_inside_m > 0.5 * line_length_m):
+                                    is_required = True
+                                else:
+                                    is_required = False
                         
                         weight = self.haversine_distance(u["lat"], u["lon"], v["lat"], v["lon"])
                         
@@ -61,6 +75,7 @@ class GraphService:
                             "u": u_id,
                             "v": v_id,
                             "weight": weight,
+                            "required": is_required,
                             "metadata": tags
                         })
                         graph_nodes.add(u_id)
@@ -70,4 +85,3 @@ class GraphService:
             "nodes": [nodes[node_id] for node_id in graph_nodes],
             "edges": edges
         }
-

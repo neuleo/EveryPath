@@ -92,6 +92,9 @@ async def generate_route(data: GraphData):
         end_node_id = -1
         if data.end_coords:
             end_node_id = service.find_nearest_node(G, data.end_coords[0], data.end_coords[1])
+        elif data.start_coords:
+            # Fallback: if no end point, use start point to create a loop
+            end_node_id = start_node_id
 
         # Core logic in routing.py solve_cpp now handles Eulerian path vs circuit
         route_ids, is_disconnected = service.solve_cpp(G, start_node_id, end_node_id)

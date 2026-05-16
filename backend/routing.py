@@ -138,60 +138,127 @@ class RoutingService:
                     nearest_node = n
         return nearest_node
 
-    def solve_cpp(self, G: nx.Graph, start_node_id: int = -1, end_node_id: int = -1):
+    def solve_rpp(self, G: nx.Graph, s_id: int, t_id: int):
         """
-        Solves the Chinese Postman Problem (CPP) or finds an Eulerian path
-        if start and end nodes are different.
-        Returns a tuple of (list of nodes, is_disconnected flag).
+        Solves the Rural Postman Problem (RPP).
+        G contains 'required' attribute on edges.
         """
-        is_disconnected = False
-        if not nx.is_connected(G):
-            is_disconnected = True
-            G = self.connect_components(G)
-
-        # Handle start/end nodes. If not provided, pick arbitrary.
-        s = start_node_id if start_node_id != -1 and start_node_id in G else list(G.nodes())[0]
-        t = end_node_id if end_node_id != -1 and end_node_id in G else s
-
-        odd_nodes = set(self.get_odd_degree_nodes(G))
+        # 1. Subgraph of required edges
+        required_edges = [(u, v, d) for u, v, d in G.edges(data=True) if d.get('required')]
+        if not required_edges:
+            # Fallback for old data/tests: treat all as required
+            required_edges = [(u, v, d) for u, v, d in G.edges(data=True)]
+            if not required_edges:
+                return [], False
+            
+        G_R = nx.Graph()
+        for u, v, d in required_edges:
+            G_R.add_edge(u, v, **d)
         
-        # Symmetric difference to find nodes whose parity needs to change
-        # to ensure ONLY s and t have odd degrees (if s != t)
-        # or ALL nodes have even degrees (if s == t).
+        for n in G_R.nodes():
+            G_R.nodes[n].update(G.nodes[n])
+
+        # 2. Connect all components of G_R using paths from G
+        # Also ensure s_id and t_id are connected to the required graph
+        components = list(nx.connected_components(G_R))
+        
+        # We need to include s_id and t_id in the connectivity consideration
+        target_nodes = set()
+        if s_id != -1 and s_id in G: target_nodes.add(s_id)
+        if t_id != -1 and t_id in G: target_nodes.add(t_id)
+        
+        while True:
+            components = list(nx.connected_components(G_R))
+            # Check if all components AND start/end nodes are in one component
+            connected = True
+            first_comp = None
+            if components:
+                first_comp = components[0]
+                # Are all start/end nodes in G_R yet?
+                if s_id != -1 and s_id not in G_R: connected = False
+                elif t_id != -1 and t_id not in G_R: connected = False
+                # Are all nodes of G_R connected?
+                elif len(components) > 1: connected = False
+            else:
+                # No required edges, but maybe start/end?
+                if s_id != -1: first_comp = {s_id}
+                else: return [], False
+            
+            if connected: break
+            
+            # Find best connection from the "main" component to something not yet connected
+            main_comp = first_comp
+            best_path = None
+            min_weight = float('inf')
+            
+            # Nodes to connect to: other components or start/end nodes
+            potential_targets = set()
+            for i in range(1, len(components)):
+                potential_targets.update(components[i])
+            if s_id != -1 and s_id not in G_R: potential_targets.add(s_id)
+            if t_id != -1 and t_id not in G_R: potential_targets.add(t_id)
+            
+            sample_main = list(main_comp)[:20]
+            sample_targets = list(potential_targets)[:20]
+            
+            for u in sample_main:
+                for v in sample_targets:
+                    try:
+                        w = nx.shortest_path_length(G, u, v, weight='weight')
+                        if w < min_weight:
+                            min_weight = w
+                            best_path = nx.shortest_path(G, u, v, weight='weight')
+                    except nx.NetworkXNoPath:
+                        pass
+            
+            if best_path:
+                for i in range(len(best_path)-1):
+                    u_p, v_p = best_path[i], best_path[i+1]
+                    if not G_R.has_edge(u_p, v_p):
+                        G_R.add_edge(u_p, v_p, **G[u_p][v_p], required=False)
+                # Ensure node data is present
+                for n in best_path:
+                    G_R.nodes[n].update(G.nodes[n])
+            else:
+                # Tricky: disconnected graph. Force air-line if needed or break
+                break
+
+        # 3. Parity adjustment (Matching)
+        # We need s and t to have odd degrees (if s != t) or even (if s == t)
+        # and all other nodes to have even degrees.
+        s = s_id if s_id != -1 and s_id in G_R else list(G_R.nodes())[0]
+        t = t_id if t_id != -1 and t_id in G_R else s
+        
+        odd_nodes = set(self.get_odd_degree_nodes(G_R))
         if s == t:
             target_nodes = list(odd_nodes)
         else:
             target_nodes = list(odd_nodes.symmetric_difference({s, t}))
-
-        if not target_nodes:
-            # Graph already has correct parities
-            augmented_G = nx.MultiGraph(G)
-        else:
-            # Find min weight perfect matching on target_nodes
+            
+        if target_nodes:
             complete_graph = nx.Graph()
             for u, v in itertools.combinations(target_nodes, 2):
                 try:
-                    weight = nx.shortest_path_length(G, u, v, weight='weight')
-                    complete_graph.add_edge(u, v, weight=-weight)
+                    w = nx.shortest_path_length(G, u, v, weight='weight')
+                    complete_graph.add_edge(u, v, weight=-w)
                 except nx.NetworkXNoPath:
                     continue
             
             matching = nx.max_weight_matching(complete_graph, maxcardinality=True, weight='weight')
             
-            augmented_G = nx.MultiGraph(G)
+            augmented_G = nx.MultiGraph(G_R)
             for u, v in matching:
                 path = nx.shortest_path(G, u, v, weight='weight')
                 for i in range(len(path) - 1):
-                    attr = G[path[i]][path[i+1]]
-                    augmented_G.add_edge(path[i], path[i+1], **attr)
-        
-        # Find Eulerian circuit (if s==t) or Eulerian path (if s!=t)
-        if s == t:
-            edges = self._optimized_eulerian_circuit(augmented_G, s)
+                    u_p, v_p = path[i], path[i+1]
+                    augmented_G.add_edge(u_p, v_p, **G[u_p][v_p])
         else:
-            # For s != t, Hierholzer's naturally works if we start at s.
-            # The algorithm will end at t because it's the only other odd-degree node.
-            edges = self._optimized_eulerian_circuit(augmented_G, s)
-            
-        return self._edges_to_nodes(edges), is_disconnected
+            augmented_G = nx.MultiGraph(G_R)
 
+        # 4. Eulerian Path/Circuit from s to t
+        edges = self._optimized_eulerian_circuit(augmented_G, s)
+        return self._edges_to_nodes(edges), False
+
+    def solve_cpp(self, G: nx.Graph, start_node_id: int = -1, end_node_id: int = -1):
+        # Delegate to RPP
+        return self.solve_rpp(G, start_node_id, end_node_id)
