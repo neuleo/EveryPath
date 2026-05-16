@@ -13,6 +13,9 @@ function App() {
   const [startPoint, setStartPoint] = useState<[number, number] | null>(null)
   const [endPoint, setEndPoint] = useState<[number, number] | null>(null)
 
+  const [isLoading, setIsLoading] = useState(false)
+  const [loadingMessage, setLoadingMessage] = useState('')
+
   const mapRef = useRef<MapRef>(null)
 
   useEffect(() => {
@@ -44,7 +47,7 @@ function App() {
   }
 
   const handleDownloadGPX = async () => {
-    if (route.length === 0) return;
+    if (!route || route.length === 0) return;
     
     try {
       const response = await fetch('/api/export-gpx', {
@@ -69,7 +72,20 @@ function App() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-900 relative">
-      {/* Responsive Overlay */}
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 z-[1000] bg-black/40 backdrop-blur-sm flex items-center justify-center pointer-events-auto">
+          <div className="bg-slate-900 border border-white/10 p-8 rounded-2xl shadow-2xl flex flex-col items-center space-y-4 max-w-xs text-center">
+            <div className="w-10 h-10 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+            <div className="space-y-1">
+              <p className="text-white font-bold">{loadingMessage}</p>
+              <p className="text-slate-400 text-[10px] uppercase tracking-widest">Bitte warten...</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Responsive Overlay UI */}
       <div className="absolute top-4 left-4 right-4 md:right-auto md:w-80 z-[100] pointer-events-none">
         <div className="bg-black/85 p-5 md:p-6 rounded-2xl border border-white/10 text-white pointer-events-auto backdrop-blur-md shadow-2xl">
           <div className="flex justify-between items-start mb-4">
@@ -133,14 +149,14 @@ function App() {
             <div className="pt-2 flex flex-col gap-3">
               <button 
                 onClick={handleGenerateRoute}
-                disabled={!hasGraph}
+                disabled={!hasGraph || isLoading}
                 className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all duration-200 shadow-lg ${
-                  hasGraph 
+                  hasGraph && !isLoading
                     ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/50' 
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed shadow-none'
                 }`}
               >
-                Route berechnen
+                {isLoading ? 'Berechnet...' : 'Route berechnen'}
               </button>
 
               {route && route.length > 0 && (
@@ -150,7 +166,8 @@ function App() {
                 >
                   GPX Exportieren
                 </button>
-              )}            </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -168,6 +185,10 @@ function App() {
           }}
           onStartPointSet={(coords) => setStartPoint(coords)}
           onEndPointSet={(coords) => setEndPoint(coords)}
+          onLoadingChange={(loading, msg) => {
+            setIsLoading(loading);
+            if (msg) setLoadingMessage(msg);
+          }}
         />
       </div>
     </div>

@@ -10,6 +10,7 @@ interface MapProps {
   onRouteGenerated: (route: any[]) => void;
   onStartPointSet?: (coords: [number, number] | null) => void;
   onEndPointSet?: (coords: [number, number] | null) => void;
+  onLoadingChange?: (isLoading: boolean, message?: string) => void;
 }
 
 export interface MapRef {
@@ -97,7 +98,7 @@ const drawStyles = [
   }
 ];
 
-export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetched, onRouteGenerated, onStartPointSet, onEndPointSet }, ref) => {
+export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetched, onRouteGenerated, onStartPointSet, onEndPointSet, onLoadingChange }, ref) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const draw = useRef<MapboxDraw | null>(null);
@@ -112,16 +113,17 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
   const endCoords = useRef<[number, number] | null>(null);
   const userLocation = useRef<[number, number] | null>(null);
 
-  const propsRef = useRef({ onGraphFetched, onRouteGenerated, includeDeadEnds, onStartPointSet, onEndPointSet });
+  const propsRef = useRef({ onGraphFetched, onRouteGenerated, includeDeadEnds, onStartPointSet, onEndPointSet, onLoadingChange });
   useEffect(() => {
-    propsRef.current = { onGraphFetched, onRouteGenerated, includeDeadEnds, onStartPointSet, onEndPointSet };
-  }, [onGraphFetched, onRouteGenerated, includeDeadEnds, onStartPointSet, onEndPointSet]);
+    propsRef.current = { onGraphFetched, onRouteGenerated, includeDeadEnds, onStartPointSet, onEndPointSet, onLoadingChange };
+  }, [onGraphFetched, onRouteGenerated, includeDeadEnds, onStartPointSet, onEndPointSet, onLoadingChange]);
 
   useImperativeHandle(ref, () => ({
     generateRoute: async () => {
       if (!currentGraph.current || !map.current) return;
       
       try {
+        propsRef.current.onLoadingChange?.(true, 'Route wird berechnet...');
         const start = startCoords.current || userLocation.current;
         const response = await fetch('/api/generate-route', {
           method: 'POST',
@@ -134,6 +136,11 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
             end_coords: endCoords.current
           })
         });
+        
+        if (!response.ok) {
+          throw new Error('Fehler bei der Routenberechnung');
+        }
+
         const data = await response.json();
         
         if (!data || !data.route) {
@@ -166,6 +173,8 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
           
           if (progress < totalNodes) {
              animationRef.current = requestAnimationFrame(animateLine);
+          } else {
+            propsRef.current.onLoadingChange?.(false);
           }
         };
         
@@ -173,10 +182,13 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
           animateLine();
         } else {
           routeSource?.setData({ type: 'FeatureCollection', features: [] });
+          propsRef.current.onLoadingChange?.(false);
         }
 
-      } catch (err) {
-        console.error('Map: Route Generation Error:', err);
+      } catch (err: any) {
+        console.error('Map: Route Error:', err);
+        setMapError(err.message);
+        propsRef.current.onLoadingChange?.(false);
       }
     },
     resetMap: () => {
@@ -279,14 +291,20 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
           });
         });
 
+        let fetchAbortController: AbortController | null = null;
+        let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
         const updatePolygon = async () => {
           const data = draw.current?.getAll();
           if (data && data.features.length > 0) {
             const feature = data.features[0];
             if (feature.geometry.type === 'Polygon') {
               try {
+                if (fetchAbortController) fetchAbortController.abort();
+                fetchAbortController = new AbortController();
+
+                propsRef.current.onLoadingChange?.(true, 'Straßennetz wird geladen...');
                 const coords = (feature.geometry as any).coordinates[0];
-                // Pass start/end coords to fetch-osm so it can expand the area
                 const response = await fetch('/api/fetch-osm', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -294,12 +312,23 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
                     coordinates: coords,
                     start_coords: startCoords.current || userLocation.current,
                     end_coords: endCoords.current
-                  })
+                  }),
+                  signal: fetchAbortController.signal
                 });
+                
+                if (!response.ok) {
+                  let errDetail = `Server-Fehler: ${response.status}`;
+                  try {
+                    const errData = await response.json();
+                    if (errData && errData.detail) errDetail = errData.detail;
+                  } catch (e) {}
+                  throw new Error(errDetail);
+                }
                 
                 const graphData = await response.json();
                 currentGraph.current = graphData;
                 propsRef.current.onGraphFetched(graphData);
+                propsRef.current.onLoadingChange?.(false);
                 
                 const features = graphData.edges
                   .filter((edge: any) => edge.required !== false)
@@ -322,13 +351,27 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
                 propsRef.current.onRouteGenerated([]);
 
               } catch (err: any) {
+                if (err.name === 'AbortError') return;
                 console.error('Map: Fetch Error:', err);
+                setMapError(err.message);
+                propsRef.current.onLoadingChange?.(false);
               }
             }
           }
         };
 
+        const debouncedUpdatePolygon = () => {
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            updatePolygon();
+          }, 800);
+        };
+
         const clearMapInternal = () => {
+          if (debounceTimer) clearTimeout(debounceTimer);
+          if (fetchAbortController) fetchAbortController.abort();
+          if (animationRef.current) cancelAnimationFrame(animationRef.current);
+
           currentGraph.current = null;
           propsRef.current.onGraphFetched({ nodes: [], edges: [] });
           propsRef.current.onRouteGenerated([]);
@@ -340,8 +383,8 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
           routeSource?.setData({ type: 'FeatureCollection', features: [] });
         };
 
-        m.on('draw.create', updatePolygon);
-        m.on('draw.update', updatePolygon);
+        m.on('draw.create', debouncedUpdatePolygon);
+        m.on('draw.update', debouncedUpdatePolygon);
         m.on('draw.delete', clearMapInternal);
 
       } catch (err: any) {
@@ -371,7 +414,6 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
     };
   }, []);
 
-  // Update markers when coords change
   useEffect(() => {
     if (!map.current) return;
     const m = map.current;
