@@ -23,3 +23,8 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 - [~] **Track: Custom Start and End Points**
 *Link: [./tracks/custom_points_20260515/](./tracks/custom_points_20260515/)*
+
+---
+
+- [ ] **Track: Ich will, das man die punkte vom polygon leiocht verschieben kann und zwischen jeden 2 punkten noch einen weiteren adden kann. da soll sowas wie ein plus sein, das man einfach sehen kann, da kann man draufklicken, um einen weiteren punkt hinzuzufügen**
+*Link: [./tracks/polygon_editing_20260515/](./tracks/polygon_editing_20260515/)*

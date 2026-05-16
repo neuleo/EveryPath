@@ -1,0 +1,8 @@
+{
+  "track_id": "polygon_editing_20260515",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-05-15T22:00:00Z",
+  "updated_at": "2026-05-15T22:00:00Z",
+  "description": "Ich will, das man die punkte vom polygon leiocht verschieben kann und zwischen jeden 2 punkten noch einen weiteren adden kann. da soll sowas wie ein plus sein, das man einfach sehen kann, da kann man draufklicken, um einen weiteren punkt hinzuzufügen"
+}
