@@ -20,7 +20,7 @@
 - [x] Task: Final verification of the end-to-end routing flow with custom points
 - [x] Task: Conductor - User Manual Verification 'Integration & Fallbacks' (Protocol in workflow.md)
 
-## Phase 4: Progress Visualization
-- [ ] Task: Implement a staged progress indicator (Steps 1-4) in the loading overlay
-- [ ] Task: Add a visual progress bar that animates during route generation
-- [ ] Task: Final UX verification of the loading states
+## Phase 4: Progress Visualization [checkpoint: a599500]
+- [x] Task: Implement a staged progress indicator (Steps 1-4) in the loading overlay
+- [x] Task: Add a visual progress bar that animates during route generation
+- [x] Task: Final UX verification of the loading states
