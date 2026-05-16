@@ -18,8 +18,3 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ## Phase 3: Native Mobile Apps
 - [Native Mobile App Development (native_mobile_app_20260515)](./tracks/native_mobile_app_20260515/index.md) - [new]
-
----
-
-- [ ] **Track: Polygon Editing (Leichter verschieben & Punkte hinzufügen)**
-*Link: [./tracks/polygon_editing_20260515/index.md](./tracks/polygon_editing_20260515/index.md)*
