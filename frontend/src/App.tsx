@@ -15,6 +15,7 @@ function App() {
 
   const [isLoading, setIsLoading] = useState(false)
   const [loadingMessage, setLoadingMessage] = useState('')
+  const [progress, setProgress] = useState(0)
 
   const mapRef = useRef<MapRef>(null)
 
@@ -28,6 +29,34 @@ function App() {
       })
   }, [])
 
+  // Handle simulated progress for route calculation
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (isLoading && loadingMessage.includes('Route')) {
+      setProgress(0);
+      interval = setInterval(() => {
+        setProgress(prev => {
+          if (prev < 30) return prev + 2; // Fast start
+          if (prev < 70) return prev + 0.5; // Slow down
+          if (prev < 95) return prev + 0.1; // Crawl at the end
+          return prev;
+        });
+      }, 200);
+    } else {
+      setProgress(0);
+    }
+    return () => clearInterval(interval);
+  }, [isLoading, loadingMessage]);
+
+  // Handle stage messages based on progress
+  useEffect(() => {
+    if (isLoading && loadingMessage.includes('Route')) {
+      if (progress > 80) setLoadingMessage('Optimiere Wendemanöver...');
+      else if (progress > 50) setLoadingMessage('Berechne Kreuzungs-Abgleiche...');
+      else if (progress > 20) setLoadingMessage('Analysiere Netzwerk-Struktur...');
+    }
+  }, [progress, isLoading]);
+
   const handleGenerateRoute = () => {
     mapRef.current?.generateRoute();
   }
@@ -36,6 +65,7 @@ function App() {
     mapRef.current?.resetMap();
     setStartPoint(null);
     setEndPoint(null);
+    setRoute([]);
   }
 
   const handleSetStartMode = () => {
@@ -74,13 +104,33 @@ function App() {
     <div className="h-screen w-screen flex flex-col bg-slate-900 relative">
       {/* Loading Overlay */}
       {isLoading && (
-        <div className="absolute inset-0 z-[1000] bg-black/40 backdrop-blur-sm flex items-center justify-center pointer-events-auto">
-          <div className="bg-slate-900 border border-white/10 p-8 rounded-2xl shadow-2xl flex flex-col items-center space-y-4 max-w-xs text-center">
-            <div className="w-10 h-10 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
-            <div className="space-y-1">
-              <p className="text-white font-bold">{loadingMessage}</p>
-              <p className="text-slate-400 text-[10px] uppercase tracking-widest">Bitte warten...</p>
+        <div className="absolute inset-0 z-[1000] bg-black/60 backdrop-blur-md flex items-center justify-center pointer-events-auto transition-all duration-500">
+          <div className="bg-slate-900 border border-white/10 p-10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col items-center space-y-8 max-w-sm w-full text-center">
+            <div className="relative flex items-center justify-center">
+              <div className="w-20 h-20 border-4 border-blue-500/10 border-t-blue-500 rounded-full animate-spin" />
+              <div className="absolute text-blue-400 font-mono text-xs font-bold">
+                {Math.round(progress)}%
+              </div>
             </div>
+            
+            <div className="space-y-4 w-full">
+              <div className="space-y-2">
+                <p className="text-white text-lg font-bold tracking-tight">{loadingMessage}</p>
+                <p className="text-slate-400 text-[10px] uppercase tracking-[0.2em] font-semibold opacity-60">System arbeitet</p>
+              </div>
+              
+              {/* Progress Bar */}
+              <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                <div 
+                  className="h-full bg-gradient-to-r from-blue-600 to-indigo-400 transition-all duration-300 ease-out shadow-[0_0_10px_rgba(37,99,235,0.4)]"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+
+            <p className="text-slate-500 text-[10px] leading-relaxed italic">
+              Bei großen Flächen kann dieser Vorgang <br/> bis zu 30 Sekunden dauern.
+            </p>
           </div>
         </div>
       )}
