@@ -7,17 +7,30 @@ import App from './App'
 vi.mock('maplibre-gl', () => {
   const MapMock = vi.fn(function (this: any) {
     this.on = vi.fn();
+    this.off = vi.fn();
     this.remove = vi.fn();
     this.addControl = vi.fn();
+    this.getSource = vi.fn();
   });
   const NavigationControlMock = vi.fn();
+  const GeolocateControlMock = vi.fn();
+  const MarkerMock = vi.fn(function (this: any) {
+    this.setLngLat = vi.fn().mockReturnThis();
+    this.addTo = vi.fn().mockReturnThis();
+    this.remove = vi.fn();
+  });
+  
   return {
     default: {
       Map: MapMock,
       NavigationControl: NavigationControlMock,
+      GeolocateControl: GeolocateControlMock,
+      Marker: MarkerMock,
     },
     Map: MapMock,
     NavigationControl: NavigationControlMock,
+    GeolocateControl: GeolocateControlMock,
+    Marker: MarkerMock,
   };
 })
 

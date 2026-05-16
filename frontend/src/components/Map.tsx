@@ -1,14 +1,21 @@
-import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
-import type { OSMNode, OSMEdge, GraphData, RouteResponse } from '../types';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 
 interface MapProps {
   includeDeadEnds: boolean;
-  onGraphFetched: (data: GraphData) => void;
-  onRouteGenerated: (route: OSMNode[]) => void;
+  onGraphFetched: (data: any) => void;
+  onRouteGenerated: (route: any[]) => void;
+  onStartPointSet?: (coords: [number, number] | null) => void;
+  onEndPointSet?: (coords: [number, number] | null) => void;
+}
+
+export interface MapRef {
+  generateRoute: () => Promise<void>;
+  resetMap: () => void;
+  setPointMode: (mode: 'start' | 'end' | null) => void;
 }
 
 const drawStyles = [
@@ -90,30 +97,120 @@ const drawStyles = [
   }
 ];
 
-export interface MapRef {
-  generateRoute: () => Promise<void>;
-  resetMap: () => void;
-}
-
-export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetched, onRouteGenerated }, ref) => {
+export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetched, onRouteGenerated, onStartPointSet, onEndPointSet }, ref) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const draw = useRef<MapboxDraw | null>(null);
-  const [mapError, setMapError] = useState<string | null>(null);
-  const [warning, setWarning] = useState<string | null>(null);
-  const currentGraph = useRef<any>(null);
   const animationRef = useRef<number | null>(null);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const currentGraph = useRef<any>(null);
+  const [pointMode, _setPointMode] = useState<'start' | 'end' | null>(null);
+  
+  const startMarker = useRef<maplibregl.Marker | null>(null);
+  const endMarker = useRef<maplibregl.Marker | null>(null);
+  const startCoords = useRef<[number, number] | null>(null);
+  const endCoords = useRef<[number, number] | null>(null);
 
-  const propsRef = useRef({ onGraphFetched, onRouteGenerated, includeDeadEnds });
+  const propsRef = useRef({ onGraphFetched, onRouteGenerated, includeDeadEnds, onStartPointSet, onEndPointSet });
   useEffect(() => {
-    propsRef.current = { onGraphFetched, onRouteGenerated, includeDeadEnds };
-  }, [onGraphFetched, onRouteGenerated, includeDeadEnds]);
+    propsRef.current = { onGraphFetched, onRouteGenerated, includeDeadEnds, onStartPointSet, onEndPointSet };
+  }, [onGraphFetched, onRouteGenerated, includeDeadEnds, onStartPointSet, onEndPointSet]);
+
+  useImperativeHandle(ref, () => ({
+    generateRoute: async () => {
+      if (!currentGraph.current || !map.current) return;
+      
+      try {
+        const response = await fetch('/api/generate-route', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nodes: currentGraph.current.nodes,
+            edges: currentGraph.current.edges,
+            include_dead_ends: propsRef.current.includeDeadEnds,
+            start_coords: startCoords.current,
+            end_coords: endCoords.current
+          })
+        });
+        const data = await response.json();
+        propsRef.current.onRouteGenerated(data.route);
+        
+        const routeCoords = data.route.map((node: any) => [node.lon, node.lat]);
+        const routeSource = map.current?.getSource('route') as maplibregl.GeoJSONSource;
+        
+        if (animationRef.current) cancelAnimationFrame(animationRef.current);
+        
+        let progress = 0;
+        const totalNodes = routeCoords.length;
+        const drawStep = Math.max(1, Math.floor(totalNodes / 120)); 
+        
+        const animateLine = () => {
+          progress += drawStep;
+          if (progress > totalNodes) progress = totalNodes;
+          
+          routeSource?.setData({
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: routeCoords.slice(0, progress)
+            },
+            properties: {}
+          } as any);
+          
+          if (progress < totalNodes) {
+             animationRef.current = requestAnimationFrame(animateLine);
+          }
+        };
+        
+        if (totalNodes > 0) {
+          animateLine();
+        } else {
+          routeSource?.setData({ type: 'FeatureCollection', features: [] });
+        }
+
+      } catch (err) {
+        console.error('Map: Route Generation Error:', err);
+      }
+    },
+    resetMap: () => {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      if (draw.current) {
+        draw.current.deleteAll();
+        draw.current.changeMode('draw_polygon');
+        currentGraph.current = null;
+        propsRef.current.onGraphFetched({ nodes: [], edges: [] });
+        propsRef.current.onRouteGenerated([]);
+        
+        if (map.current) {
+          const osmSource = map.current.getSource('osm-edges') as maplibregl.GeoJSONSource;
+          osmSource?.setData({ type: 'FeatureCollection', features: [] });
+          const routeSource = map.current.getSource('route') as maplibregl.GeoJSONSource;
+          routeSource?.setData({ type: 'FeatureCollection', features: [] });
+        }
+
+        if (startMarker.current) {
+          startMarker.current.remove();
+          startMarker.current = null;
+          startCoords.current = null;
+          propsRef.current.onStartPointSet?.(null);
+        }
+        if (endMarker.current) {
+          endMarker.current.remove();
+          endMarker.current = null;
+          endCoords.current = null;
+          propsRef.current.onEndPointSet?.(null);
+        }
+      }
+    },
+    setPointMode: (mode: 'start' | 'end' | null) => {
+      _setPointMode(mode);
+    }
+  }));
 
   useEffect(() => {
     if (map.current || !mapContainer.current) return;
     
-    // Default center (Munich) if geolocation fails
-    let initialCenter: [number, number] = [11.582, 48.135];
+    const initialCenter: [number, number] = [11.582, 48.135];
     
     const initMap = (center: [number, number]) => {
       try {
@@ -175,85 +272,49 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
           });
         });
 
-        let fetchAbortController: AbortController | null = null;
-        let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-
         const updatePolygon = async () => {
           const data = draw.current?.getAll();
           if (data && data.features.length > 0) {
             const feature = data.features[0];
             if (feature.geometry.type === 'Polygon') {
               try {
-                if (fetchAbortController) {
-                  fetchAbortController.abort();
-                }
-                fetchAbortController = new AbortController();
-
                 const coords = (feature.geometry as any).coordinates[0];
                 const response = await fetch('/api/fetch-osm', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ coordinates: coords }),
-                  signal: fetchAbortController.signal
+                  body: JSON.stringify({ coordinates: coords })
                 });
                 
-                if (!response.ok) {
-                  let errDetail = `Server error: ${response.status} ${response.statusText}`;
-                  try {
-                    const errData = await response.json();
-                    if (errData && errData.detail) errDetail = errData.detail;
-                  } catch (e) {
-                    // Ignore JSON parsing errors for 502/504 HTML pages
-                  }
-                  throw new Error(errDetail);
-                }
-                
-                const graphData: GraphData = await response.json();
+                const graphData = await response.json();
                 currentGraph.current = graphData;
                 propsRef.current.onGraphFetched(graphData);
-                setWarning(null);
                 
-                const features = graphData.edges.map((edge: OSMEdge) => {
-                  const u = graphData.nodes.find((n: OSMNode) => n.id === edge.u);
-                  const v = graphData.nodes.find((n: OSMNode) => n.id === edge.v);
+                const features = graphData.edges.map((edge: any) => {
+                  const u = graphData.nodes.find((n: any) => n.id === edge.u);
+                  const v = graphData.nodes.find((n: any) => n.id === edge.v);
                   if (!u || !v) return null;
                   return {
                     type: 'Feature',
                     geometry: { type: 'LineString', coordinates: [[u.lon, u.lat], [v.lon, v.lat]] },
                     properties: edge.metadata
                   };
-                }).filter((f: any) => f !== null) as any;
+                }).filter((f: any) => f !== null);
                 
                 const source = m.getSource('osm-edges') as maplibregl.GeoJSONSource;
                 source?.setData({ type: 'FeatureCollection', features });
 
-                if (animationRef.current) cancelAnimationFrame(animationRef.current);
                 const routeSource = m.getSource('route') as maplibregl.GeoJSONSource;
                 routeSource?.setData({ type: 'FeatureCollection', features: [] });
                 propsRef.current.onRouteGenerated([]);
 
               } catch (err: any) {
-                if (err.name === 'AbortError') return;
                 console.error('Map: Fetch Error:', err);
-                setMapError(err.message);
-                setTimeout(() => setMapError(null), 5000);
               }
             }
           }
         };
 
-        const debouncedUpdatePolygon = () => {
-          if (debounceTimer) clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(() => {
-            updatePolygon();
-          }, 800);
-        };
-
-        const clearMap = () => {
-          if (debounceTimer) clearTimeout(debounceTimer);
-          if (fetchAbortController) fetchAbortController.abort();
-          if (animationRef.current) cancelAnimationFrame(animationRef.current);
-          
+        const clearMapInternal = () => {
           currentGraph.current = null;
           propsRef.current.onGraphFetched({ nodes: [], edges: [] });
           propsRef.current.onRouteGenerated([]);
@@ -265,24 +326,21 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
           routeSource?.setData({ type: 'FeatureCollection', features: [] });
         };
 
-        m.on('draw.create', debouncedUpdatePolygon);
-        m.on('draw.update', debouncedUpdatePolygon);
-        m.on('draw.delete', clearMap);
+        m.on('draw.create', updatePolygon);
+        m.on('draw.update', updatePolygon);
+        m.on('draw.delete', clearMapInternal);
 
       } catch (err: any) {
         setMapError(err.message);
       }
     };
 
-    // Attempt to get current position
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          console.log('Location found:', position.coords.latitude, position.coords.longitude);
           initMap([position.coords.longitude, position.coords.latitude]);
         },
-        (error) => {
-          console.warn('Geolocation failed:', error);
+        () => {
           initMap(initialCenter);
         },
         { enableHighAccuracy: true, timeout: 5000 }
@@ -297,111 +355,54 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
     };
   }, []);
 
-  useImperativeHandle(ref, () => ({
-    generateRoute: async () => {
-      if (!currentGraph.current || !map.current) return;
-      try {
-        const response = await fetch('/api/generate-route', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            nodes: currentGraph.current.nodes,
-            edges: currentGraph.current.edges,
-            include_dead_ends: propsRef.current.includeDeadEnds
-          })
-        });
+  useEffect(() => {
+    if (!map.current) return;
+    const m = map.current;
 
-        if (!response.ok) {
-          let errDetail = `Server error: ${response.status} ${response.statusText}`;
-          try {
-            const errData = await response.json();
-            if (errData && errData.detail) errDetail = errData.detail;
-          } catch (e) {
-            // Ignore JSON parsing errors for HTML pages
-          }
-          throw new Error(errDetail);
-        }
+    const handleSetPoint = (e: maplibregl.MapMouseEvent) => {
+      if (!pointMode) return;
 
-        const data: RouteResponse = await response.json();
-        propsRef.current.onRouteGenerated(data.route);
-        
-        if (data.is_disconnected) {
-          setWarning("Teile des Polygons sind nicht erreichbar. Die Route deckt nur den größten zusammenhängenden Teil ab.");
+      const lngLat: [number, number] = [e.lngLat.lng, e.lngLat.lat];
+      
+      if (pointMode === 'start') {
+        startCoords.current = lngLat;
+        if (!startMarker.current) {
+          startMarker.current = new maplibregl.Marker({ color: '#22c55e' }).setLngLat(lngLat).addTo(m);
         } else {
-          setWarning(null);
+          startMarker.current.setLngLat(lngLat);
         }
-
-        const routeCoords = data.route.map((node: OSMNode) => [node.lon, node.lat]);
-        const routeSource = map.current?.getSource('route') as maplibregl.GeoJSONSource;
-        
-        if (animationRef.current) cancelAnimationFrame(animationRef.current);
-        
-        let progress = 0;
-        const totalNodes = routeCoords.length;
-        // Adjust speed based on route length (target ~2 seconds for animation)
-        const drawStep = Math.max(1, Math.floor(totalNodes / 120)); 
-        
-        const animateLine = () => {
-          progress += drawStep;
-          if (progress > totalNodes) progress = totalNodes;
-          
-          routeSource?.setData({
-            type: 'Feature',
-            geometry: {
-              type: 'LineString',
-              coordinates: routeCoords.slice(0, progress)
-            },
-            properties: {}
-          } as any);
-          
-          if (progress < totalNodes) {
-             animationRef.current = requestAnimationFrame(animateLine);
-          }
-        };
-        
-        if (totalNodes > 0) {
-          animateLine();
+        propsRef.current.onStartPointSet?.(lngLat);
+      } else {
+        endCoords.current = lngLat;
+        if (!endMarker.current) {
+          endMarker.current = new maplibregl.Marker({ color: '#ef4444' }).setLngLat(lngLat).addTo(m);
         } else {
-          routeSource?.setData({ type: 'FeatureCollection', features: [] });
+          endMarker.current.setLngLat(lngLat);
         }
-      } catch (err: any) {
-        console.error('Map: Route Error:', err);
-        setMapError(err.message);
+        propsRef.current.onEndPointSet?.(lngLat);
       }
-    },
-    resetMap: () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-      if (draw.current) {
-        draw.current.deleteAll();
-        draw.current.changeMode('draw_polygon');
-        // Trigger manual update because deleteAll() doesn't fire events
-        currentGraph.current = null;
-        setWarning(null);
-        propsRef.current.onGraphFetched({ nodes: [], edges: [] });
-        propsRef.current.onRouteGenerated([]);
-        
-        if (map.current) {
-          const osmSource = map.current.getSource('osm-edges') as maplibregl.GeoJSONSource;
-          osmSource?.setData({ type: 'FeatureCollection', features: [] });
-          const routeSource = map.current.getSource('route') as maplibregl.GeoJSONSource;
-          routeSource?.setData({ type: 'FeatureCollection', features: [] });
-        }
-      }
-    }
-  }));
+      
+      _setPointMode(null);
+    };
+
+    m.on('click', handleSetPoint);
+    return () => {
+      m.off('click', handleSetPoint);
+    };
+  }, [pointMode]);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div ref={mapContainer} style={{ position: 'absolute', inset: 0 }} />
-      {mapError && (
-        <div style={{ position: 'absolute', bottom: '40px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#ef4444', color: 'white', padding: '12px 24px', borderRadius: '8px', zIndex: 1000, boxShadow: '0 4px 12px rgba(0,0,0,0.5)', fontWeight: 'bold' }}>
-          {mapError}
+      {pointMode && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-blue-600 text-white px-6 py-2 rounded-full font-bold shadow-lg animate-pulse">
+          Klicke auf die Karte, um den {pointMode === 'start' ? 'STARTPUNKT' : 'ENDPUNKT'} zu setzen
         </div>
       )}
-      {warning && (
-        <div style={{ position: 'absolute', top: '40px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#fbb03b', color: 'black', padding: '12px 24px', borderRadius: '8px', zIndex: 1000, boxShadow: '0 4px 12px rgba(0,0,0,0.5)', fontWeight: 'bold', maxWidth: '80%', textAlign: 'center' }}>
-          {warning}
-          <button onClick={() => setWarning(null)} style={{ marginLeft: '16px', border: 'none', background: 'rgba(0,0,0,0.1)', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px' }}>OK</button>
+      {mapError && (
+        <div style={{ position: 'absolute', bottom: '40px', left: '50%', transform: 'translateX(-50%)', backgroundColor: 'rgba(220, 38, 38, 0.9)', color: 'white', padding: '24px', borderRadius: '12px', zIndex: 1000 }}>
+          <h2 style={{ margin: '0 0 8px 0' }}>Map Error</h2>
+          <p style={{ margin: 0, fontSize: '14px' }}>{mapError}</p>
         </div>
       )}
     </div>

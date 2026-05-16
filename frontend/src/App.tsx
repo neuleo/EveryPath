@@ -1,16 +1,19 @@
 import { useState, useEffect, useRef } from 'react'
 import { Map } from './components/Map'
 import type { MapRef } from './components/Map'
-import type { OSMNode } from './types'
 import './index.css'
 
 function App() {
-  const mapRef = useRef<MapRef>(null)
   const [backendStatus, setBackendStatus] = useState<string>('Checking...')
   const [includeDeadEnds, setIncludeDeadEnds] = useState(true)
   const [hasGraph, setHasGraph] = useState(false)
   const [edgeCount, setEdgeCount] = useState(0)
-  const [route, setRoute] = useState<OSMNode[]>([])
+  const [route, setRoute] = useState<any[]>([])
+  
+  const [startPoint, setStartPoint] = useState<[number, number] | null>(null)
+  const [endPoint, setEndPoint] = useState<[number, number] | null>(null)
+
+  const mapRef = useRef<MapRef>(null)
 
   useEffect(() => {
     fetch('/api/health')
@@ -28,6 +31,16 @@ function App() {
 
   const handleReset = () => {
     mapRef.current?.resetMap();
+    setStartPoint(null);
+    setEndPoint(null);
+  }
+
+  const handleSetStartMode = () => {
+    mapRef.current?.setPointMode('start');
+  }
+
+  const handleSetEndMode = () => {
+    mapRef.current?.setPointMode('end');
   }
 
   const handleDownloadGPX = async () => {
@@ -64,13 +77,13 @@ function App() {
               <h1 className="m-0 text-2xl md:text-3xl font-bold text-white tracking-tight">EveryPath</h1>
               <p className="m-0 mt-1 text-[10px] md:text-xs opacity-50 tracking-widest uppercase font-semibold">Routing & Coverage</p>
             </div>
-            {hasGraph && (
+            {(hasGraph || startPoint || endPoint) && (
               <button 
                 onClick={handleReset}
-                title="Auswahl löschen"
+                title="Alles löschen"
                 className="bg-red-500/10 border border-red-500/20 text-red-500 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer hover:bg-red-500/20 transition-colors"
               >
-                LÖSCHEN
+                RESET
               </button>
             )}
           </div>
@@ -95,6 +108,25 @@ function App() {
               <div className={`w-10 h-5 rounded-full relative transition-colors duration-200 ease-in-out ${includeDeadEnds ? 'bg-blue-500' : 'bg-slate-700'}`}>
                 <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-all duration-200 ease-in-out ${includeDeadEnds ? 'left-[22px]' : 'left-0.5'}`} />
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button 
+                onClick={handleSetStartMode}
+                className={`py-2 px-3 rounded-lg text-[10px] font-bold border transition-all ${
+                  startPoint ? 'bg-green-500/20 border-green-500/50 text-green-400' : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                }`}
+              >
+                {startPoint ? 'START ÄNDERN' : 'START SETZEN'}
+              </button>
+              <button 
+                onClick={handleSetEndMode}
+                className={`py-2 px-3 rounded-lg text-[10px] font-bold border transition-all ${
+                  endPoint ? 'bg-red-500/20 border-red-500/50 text-red-400' : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                }`}
+              >
+                {endPoint ? 'ZIEL ÄNDERN' : 'ZIEL SETZEN'}
+              </button>
             </div>
 
             {/* Actions */}
@@ -135,11 +167,12 @@ function App() {
           onRouteGenerated={(r) => {
             setRoute(r);
           }}
+          onStartPointSet={(coords) => setStartPoint(coords)}
+          onEndPointSet={(coords) => setEndPoint(coords)}
         />
       </div>
     </div>
   )
-
 }
 
 export default App
