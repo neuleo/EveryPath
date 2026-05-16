@@ -143,15 +143,14 @@ function App() {
                 Route berechnen
               </button>
 
-              {route.length > 0 && (
+              {route && route.length > 0 && (
                 <button 
                   onClick={handleDownloadGPX}
                   className="w-full py-3.5 rounded-xl font-bold text-sm bg-emerald-500 hover:bg-emerald-400 text-white transition-colors shadow-lg shadow-emerald-900/50"
                 >
                   GPX Exportieren
                 </button>
-              )}
-            </div>
+              )}            </div>
           </div>
         </div>
       </div>

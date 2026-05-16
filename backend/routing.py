@@ -215,7 +215,10 @@ class RoutingService:
                 for i in range(len(best_path)-1):
                     u_p, v_p = best_path[i], best_path[i+1]
                     if not G_R.has_edge(u_p, v_p):
-                        G_R.add_edge(u_p, v_p, **G[u_p][v_p], required=False)
+                        # Avoid duplicate 'required' key if it exists in attributes
+                        edge_data = G[u_p][v_p].copy()
+                        edge_data['required'] = False
+                        G_R.add_edge(u_p, v_p, **edge_data)
                 # Ensure node data is present
                 for n in best_path:
                     G_R.nodes[n].update(G.nodes[n])

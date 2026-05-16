@@ -135,6 +135,11 @@ export const Map = forwardRef<MapRef, MapProps>(({ includeDeadEnds, onGraphFetch
           })
         });
         const data = await response.json();
+        
+        if (!data || !data.route) {
+          throw new Error('Keine Route vom Server erhalten');
+        }
+
         propsRef.current.onRouteGenerated(data.route);
         
         const routeCoords = data.route.map((node: any) => [node.lon, node.lat]);
