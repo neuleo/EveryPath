@@ -29,31 +29,39 @@ function App() {
       })
   }, [])
 
-  // Handle simulated progress for route calculation
+  // Handle simulated progress for all loading states
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
-    if (isLoading && loadingMessage.includes('Route')) {
+    if (isLoading) {
       setProgress(0);
       interval = setInterval(() => {
         setProgress(prev => {
-          if (prev < 30) return prev + 2; // Fast start
-          if (prev < 70) return prev + 0.5; // Slow down
-          if (prev < 95) return prev + 0.1; // Crawl at the end
+          if (prev < 40) return prev + 3; // Initial burst
+          if (prev < 80) return prev + 0.8; // Steady progress
+          if (prev < 98) return prev + 0.1; // Slow crawl near the end
           return prev;
         });
-      }, 200);
+      }, 150);
     } else {
       setProgress(0);
     }
     return () => clearInterval(interval);
-  }, [isLoading, loadingMessage]);
+  }, [isLoading]);
 
-  // Handle stage messages based on progress
+  // Handle stage messages based on progress and current task
   useEffect(() => {
-    if (isLoading && loadingMessage.includes('Route')) {
-      if (progress > 80) setLoadingMessage('Optimiere Wendemanöver...');
-      else if (progress > 50) setLoadingMessage('Berechne Kreuzungs-Abgleiche...');
-      else if (progress > 20) setLoadingMessage('Analysiere Netzwerk-Struktur...');
+    if (isLoading) {
+      const isRoute = loadingMessage.includes('Route');
+      const isNetwork = loadingMessage.includes('Netz');
+
+      if (isRoute) {
+        if (progress > 85) setLoadingMessage('Finalisiere Route...');
+        else if (progress > 60) setLoadingMessage('Optimiere Wendemanöver...');
+        else if (progress > 30) setLoadingMessage('Analysiere Netzwerk-Struktur...');
+      } else if (isNetwork) {
+        if (progress > 70) setLoadingMessage('Verarbeite Geometrien...');
+        else if (progress > 30) setLoadingMessage('Empfange OpenStreetMap Daten...');
+      }
     }
   }, [progress, isLoading]);
 
